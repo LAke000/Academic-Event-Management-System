@@ -12,6 +12,14 @@
   gap: var(--space-lg);
 }
 
+#discover-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .event-card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
