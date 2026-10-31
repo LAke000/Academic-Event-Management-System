@@ -187,7 +187,7 @@ input, select, textarea {
 .top-bar {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;
   height: var(--header-height);
   background-color: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -409,21 +409,20 @@ input, select, textarea {
 
 /* App Layout Wrapper — Sidebar + Main Viewport */
 .app-layout {
-  display: flex;
-  flex-direction: row;
-  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: calc(100vh - var(--header-height));
   width: 100%;
-  position: relative;
   background: #f8fafc;
+  align-items: start;
 }
 
 .sidebar {
   width: 260px;
   min-width: 260px;
-  flex-shrink: 0;
-  height: 100vh;
+  height: calc(100vh - var(--header-height));
   position: sticky;
-  top: 0;
+  top: var(--header-height);
   overflow-y: auto;
   z-index: 100;
   background: #ffffff;
@@ -492,12 +491,14 @@ input, select, textarea {
 }
 
 .main-content {
-  flex: 1 1 0%;
   min-width: 0;
   width: 100%;
+  max-width: 100%;
   padding: 2rem;
-  overflow-y: auto;
   background: #f8fafc;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Strict role access scoping — Student Mode hides all admin-only UI. */
