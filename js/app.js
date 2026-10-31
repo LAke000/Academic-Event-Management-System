@@ -131,7 +131,7 @@ window.showToast = (message, type = "info") => {
 
   const container = getToastContainer();
   const el = document.createElement("div");
-  el.className = `toast toast--${type}`;
+  el.className = "toast show " + type + " toast--" + type;
   el.setAttribute("role", "alert");
   el.setAttribute("aria-live", "polite");
 

@@ -959,19 +959,23 @@ input[type="radio"] {
   transform: translateX(0);
 }
 
-.toast.success {
+.toast.success,
+.toast--success {
   background-color: var(--status-open);
 }
 
-.toast.error {
+.toast.error,
+.toast--error {
   background-color: var(--status-housefull);
 }
 
-.toast.warning {
+.toast.warning,
+.toast--warning {
   background-color: var(--status-pending);
 }
 
-.toast.info {
+.toast.info,
+.toast--info {
   background-color: var(--color-primary);
 }
 
