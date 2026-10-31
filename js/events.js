@@ -5,6 +5,7 @@
 // preserved end-to-end.
 
 import StorageService from "./storage.js";
+import { generateId } from "./utils.js";
 
 // ─── Cached DOM references (resolved lazily to survive late injection) ──────
 let discoverContainer = null;
@@ -359,6 +360,12 @@ const deleteEvent = (eventId) => {
   );
   StorageService.saveRegistrations(remainingRegs);
 
+  // Cascade-remove feedback for this event (zero orphaned records)
+  const remainingFeedback = StorageService.getFeedback().filter(
+    (f) => f.eventId !== eventId
+  );
+  StorageService.saveFeedback(remainingFeedback);
+
   renderDiscover();
   renderAdminTable();
   populateFilters();
@@ -433,7 +440,7 @@ const initCreateEventModal = () => {
 
     const events = StorageService.getEvents();
     const newEvent = {
-      id: `EVT-${Date.now().toString().slice(-4)}`,
+      id: generateId("EVT-", 4),
       title,
       type,
       department,

@@ -88,7 +88,7 @@ const escapeHtml = (str) => {
   return div.innerHTML;
 };
 
-const generateRegId = () => `REG-${Math.floor(100000 + Math.random() * 900000)}`;
+const generateRegId = () => generateId("REG-", 6);
 
 const formatDateTime = (iso) => {
   if (!iso) return "—";

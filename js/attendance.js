@@ -546,6 +546,17 @@ const bindEvents = () => {
       renderLiveCheckinFeed();
     });
   });
+
+  // Stop the camera scanner whenever the user navigates away from the
+  // scanner tab, preventing camera lockups / persistent stream state.
+  document.querySelectorAll("#sidebar-nav .nav-link[data-tab]").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      const targetTab = e.currentTarget.dataset.tab;
+      if (scannerRunning && targetTab !== "scanner") {
+        stopScanner();
+      }
+    });
+  });
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────

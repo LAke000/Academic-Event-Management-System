@@ -336,7 +336,7 @@ const exportFeedbackCSV = (eventId) => {
     f.eventId,
     f.rating,
     f.comments,
-    f.createdAt || "",
+    f.timestamp || "",
   ]);
   downloadCSV(headers, rows, `Feedback${eventId ? "-" + eventId : ""}.csv`);
 };

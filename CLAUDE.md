@@ -24,10 +24,14 @@
   {
     "id": "string",
     "title": "string",
+    "type": "string",
+    "department": "string",
+    "venue": "string",
     "date": "ISO8601 string",
-    "location": "string",
     "capacity": "number",
-    "registered": "number"
+    "registered": "number",
+    "status": "string",
+    "speaker": "string"
   }
   ```
 
