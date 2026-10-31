@@ -12,7 +12,7 @@ import StorageService from "./storage.js";
 const DEFAULT_ROLE = "student";
 const DEFAULT_VIEW_STUDENT = "discover";
 const DEFAULT_VIEW_ADMIN = "dashboard";
-const TOAST_DISMISS_MS = 4000;
+const TOAST_DISMISS_MS = 3200;
 
 // Tabs that live in the "Admin / Organizer" sidebar section.
 const ADMIN_TABS = [
