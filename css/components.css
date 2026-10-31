@@ -340,7 +340,11 @@
 }
 
 /* 3. Modal Dialogs (<dialog> & Overlay System) */
-dialog {
+dialog:not([open]) {
+  display: none !important;
+}
+
+dialog[open] {
   border: none;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -353,6 +357,10 @@ dialog {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 5000;
 }
 
 dialog::backdrop {

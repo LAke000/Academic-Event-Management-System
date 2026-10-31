@@ -88,7 +88,14 @@ const escapeHtml = (str) => {
   return div.innerHTML;
 };
 
-const generateRegId = () => generateId("REG-", 6);
+const generateRegId = () => {
+  const existing = StorageService.getRegistrations().map((r) => r.regId);
+  let regId;
+  do {
+    regId = generateId("REG-", 6);
+  } while (existing.includes(regId));
+  return regId;
+};
 
 const formatDateTime = (iso) => {
   if (!iso) return "—";
@@ -168,12 +175,12 @@ const handleRegistrationSubmit = (event) => {
   }
 
   // Capacity gate — current registrations vs. event capacity.
-  const event = StorageService.getEventById(eventId);
-  if (!event) {
+  const ev = StorageService.getEventById(eventId);
+  if (!ev) {
     window.showToast("Event not found.", "error");
     return;
   }
-  if (existingRegs.length >= (event.capacity || 0)) {
+  if (existingRegs.length >= (ev.capacity || 0)) {
     window.showToast("Event is at full capacity.", "error");
     return;
   }

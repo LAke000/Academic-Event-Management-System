@@ -6,6 +6,7 @@
 // breaks the application lifecycle. Zero-truncation: no data is dropped.
 
 import StorageService from "./storage.js";
+import { formatDate } from "./utils.js";
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
@@ -30,6 +31,8 @@ const ADMIN_TABS = [
 // that actually exist on each module, guarded defensively.
 const TAB_LIFECYCLE = {
   discover: ["EventsModule", "render"],
+  dashboard: ["app", "renderDashboardStats"],
+  history: ["app", "renderHistory"],
   events: ["EventsModule", "renderAdminTable"],
   passes: ["PassesModule", "renderPasses"],
   scanner: ["AttendanceModule", "init"],
@@ -385,6 +388,17 @@ const bindDataButtons = () => {
     });
   }
 
+  const loadDemoReports = document.getElementById("btn-load-demo-reports");
+  if (loadDemoReports) {
+    loadDemoReports.addEventListener("click", () => {
+      StorageService.seedDemoData(true);
+      renderDashboardStats();
+      if (typeof window.showToast === "function") {
+        window.showToast("Demo academic data loaded.", "success");
+      }
+    });
+  }
+
   const clearData = document.getElementById("btn-clear-data");
   if (clearData) {
     clearData.addEventListener("click", () => {
@@ -399,6 +413,59 @@ const bindDataButtons = () => {
 };
 
 // ─── Public surface (reachable as window.app for inline HTML handlers) ─────
+
+/**
+ * Render the student's attendance history into #history-list.
+ * Only registrations marked "Present" appear, with certificate eligibility.
+ */
+const renderHistory = () => {
+  const list = document.getElementById("history-list");
+  const empty = document.getElementById("history-empty");
+  if (!list) return;
+
+  const regs = StorageService.getRegistrations();
+  const present = regs.filter((r) => r.status === "Present");
+
+  list.innerHTML = "";
+
+  if (present.length === 0) {
+    if (empty) empty.hidden = false;
+    return;
+  }
+  if (empty) empty.hidden = true;
+
+  present.forEach((reg) => {
+    const event = StorageService.getEventById(reg.eventId);
+    const item = document.createElement("div");
+    item.className = "history-item card";
+    item.innerHTML =
+      `<div class="history-item-header">` +
+        `<span class="history-item-title">${escapeHtml(event ? event.title : "Unknown Event")}</span>` +
+        `<span class="history-item-date">${formatDate(reg.checkInTime)}</span>` +
+      `</div>` +
+      `<div class="history-item-meta">` +
+        `<span><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</span>` +
+        `<span><strong>Department:</strong> ${escapeHtml(reg.department || "—")}</span>` +
+        `<span><strong>Status:</strong> ${escapeHtml(reg.status)}</span>` +
+      `</div>` +
+      `<div class="history-item-certificate" data-regid="${escapeHtml(reg.regId)}">Download Certificate</div>`;
+    list.appendChild(item);
+  });
+
+  // Wire certificate downloads
+  list.querySelectorAll(".history-item-certificate").forEach((el) => {
+    el.addEventListener("click", () => {
+      const regId = el.dataset.regid;
+      if (typeof window.CertificateModule?.generateCertificate === "function") {
+        window.CertificateModule.generateCertificate(regId);
+      } else if (typeof CertificateModule?.generateCertificate === "function") {
+        CertificateModule.generateCertificate(regId);
+      } else {
+        window.showToast("Certificate module unavailable.", "error");
+      }
+    });
+  });
+};
 
 const app = {
   showTab,

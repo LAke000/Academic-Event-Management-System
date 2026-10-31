@@ -321,16 +321,14 @@ const renderAdminTable = () => {
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(ev.id)}</td>
       <td>${escapeHtml(ev.title)}</td>
+      <td>${escapeHtml(ev.type || "—")}</td>
       <td>${escapeHtml(ev.department)}</td>
+      <td>${escapeHtml(ev.venue)}</td>
       <td>${new Date(ev.date).toLocaleString()}</td>
-      <td style="display: flex; align-items: center; gap: var(--space-xs);">
-        <div style="width: 80px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-          <div style="width: ${Math.min(fillPercent, 100)}%; height: 100%; background: #1e3a8a;"></div>
-        </div>
-        <small style="color: var(--color-text-muted);">${registeredCount}/${capacity}</small>
-      </td>
+      <td>${capacity}</td>
+      <td>${registeredCount}</td>
+      <td><span class="badge ${ev.status === "Housefull" ? "bg-danger" : "bg-success"}">${escapeHtml(ev.status)}</span></td>
       <td>
         <button class="btn btn-sm btn-danger btn-delete" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Delete</button>
       </td>
@@ -375,7 +373,17 @@ const deleteEvent = (eventId) => {
 // ─── Event creation modal ─────────────────────────────────────────────────
 
 const initCreateEventModal = () => {
-  if (!btnCreateEvent || !createForm || !createDialog) return;
+  if (!createForm || !createDialog) return;
+
+  const emptyCreateBtn = document.getElementById("btn-create-event-empty");
+  if (emptyCreateBtn) {
+    emptyCreateBtn.addEventListener("click", () => {
+      createForm.reset();
+      if (typeof createDialog.showModal === "function") createDialog.showModal();
+    });
+  }
+
+  if (!btnCreateEvent) return;
 
   // Open dialog
   btnCreateEvent.addEventListener("click", () => {
@@ -439,8 +447,14 @@ const initCreateEventModal = () => {
     }
 
     const events = StorageService.getEvents();
+    const existingIds = events.map((ev) => ev.id);
+    let eventId;
+    do {
+      eventId = generateId("EVT-", 4);
+    } while (existingIds.includes(eventId));
+
     const newEvent = {
-      id: generateId("EVT-", 4),
+      id: eventId,
       title,
       type,
       department,

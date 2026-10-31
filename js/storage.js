@@ -240,6 +240,7 @@ class StorageService {
       {
         id: "EVT-101",
         title: "State-of-the-Art Deep Learning & Computer Vision Workshop",
+        type: "Workshop",
         department: "CSE",
         venue: "Audi-3 Block 34",
         date: "2024-11-10T09:00:00",
@@ -251,6 +252,7 @@ class StorageService {
       {
         id: "EVT-102",
         title: "Campus Cyber Defense & Network Security Seminar",
+        type: "Seminar",
         department: "IT",
         venue: "Room 401 Block 32",
         date: "2024-11-12T14:00:00",
@@ -262,6 +264,7 @@ class StorageService {
       {
         id: "EVT-103",
         title: "Hands-on Biomimetic Robotics & Continuum Systems",
+        type: "Workshop",
         department: "Mechanical & Robotics",
         venue: "Seminar Hall 2",
         date: "2024-11-15T11:00:00",
@@ -273,6 +276,7 @@ class StorageService {
       {
         id: "EVT-104",
         title: "Design Thinking for Campus Sustainability Sprint",
+        type: "Seminar",
         department: "Polytechnic / Innovation Cell",
         venue: "Innovation Lab 602",
         date: "2024-11-18T10:00:00",
