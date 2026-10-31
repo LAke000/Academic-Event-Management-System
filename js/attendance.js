@@ -204,10 +204,10 @@ const processQrPayload = (rawText) => {
     };
   }
 
-  // 5. Mark as Present with timestamp
+  // 5. Mark as Present with timestamp (dual state for cross-module consistency)
   const checkInTime = new Date().toISOString();
   allRegs[regIndex].status = "Present";
-  allRegs[regIndex].checkInTime = checkInTime;
+  allRegs[regIndex].attendance = { status: "Present", checkInTime };
   StorageService.saveRegistrations(allRegs);
 
   // Prepend entry to the live check‑in feed
@@ -262,6 +262,7 @@ const manualCheckIn = (query) => {
     const idx = allRegs.findIndex((r) => r.regId === match.regId);
     if (idx >= 0) {
       allRegs[idx].status = "Present";
+      allRegs[idx].attendance = { status: "Present", checkInTime: now };
       allRegs[idx].checkInTime = now;
       checkedCount++;
     }
