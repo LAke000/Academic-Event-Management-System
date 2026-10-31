@@ -227,6 +227,13 @@ const handleRegistrationSubmit = (event) => {
   form.reset();
   window.showToast(`Registration successful! Ticket ID: ${regId}`, "success");
   renderPasses();
+  try {
+    if (typeof window.app?.updateProfileChip === "function") {
+      window.app.updateProfileChip(StorageService.getActiveRole() || "student");
+    }
+  } catch (_err) {
+    // non-fatal: profile chip update is cosmetic
+  }
 };
 
 // ─── Digital pass rendering ───────────────────────────────────────────────

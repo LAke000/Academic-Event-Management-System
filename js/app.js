@@ -211,9 +211,19 @@ const updateProfileChip = (role) => {
     chipAvatar.textContent = role === "admin" ? "A" : "S";
   }
   if (chipStatus) {
-    chipStatus.textContent = role === "admin"
-      ? "Organizer access enabled"
-      : "Not registered for any event";
+    if (role === "admin") {
+      chipStatus.textContent = "Organizer access enabled";
+    } else {
+      try {
+        const regs = StorageService.getRegistrations();
+        const count = regs.length;
+        chipStatus.textContent = count > 0
+          ? `Registered for ${count} event(s)`
+          : "Not registered for any event";
+      } catch (err) {
+        chipStatus.textContent = "Not registered for any event";
+      }
+    }
   }
 };
 
@@ -405,6 +415,12 @@ const bindDataButtons = () => {
     loadDemoReports.addEventListener("click", () => {
       StorageService.seedDemoData(true);
       renderDashboardStats();
+      updateProfileChip(StorageService.getActiveRole() || DEFAULT_ROLE);
+      try {
+        window.ReportsModule?.renderCharts?.();
+      } catch (_err) {
+        // charts render on tab switch as fallback
+      }
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
       }
@@ -502,6 +518,7 @@ const renderHistory = () => {
 const app = {
   showTab,
   renderHistory,
+  updateProfileChip,
   seedDemoData: (force = false) => {
     try {
       StorageService.seedDemoData(force);
