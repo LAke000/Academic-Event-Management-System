@@ -5,6 +5,13 @@
    Zero-truncation, pure vanilla CSS3, no placeholders.
    ============================================================ */
 
+/* Global hidden-attribute enforcement — author display rules must not
+   override the HTML hidden attribute on empty states, toasts, nav links, etc. */
+[hidden],
+.hidden {
+  display: none !important;
+}
+
 /* 1. Event Cards & Catalog Grid */
 .events-grid {
   display: grid;
