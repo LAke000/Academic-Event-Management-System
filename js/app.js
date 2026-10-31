@@ -455,12 +455,15 @@ const renderHistory = () => {
         `<span><strong>Department:</strong> ${escapeHtml(reg.department || "—")}</span>` +
         `<span><strong>Status:</strong> ${escapeHtml(reg.status)}</span>` +
       `</div>` +
-      `<div class="history-item-certificate" data-regid="${escapeHtml(reg.regId)}">Download Certificate</div>`;
+      `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap;">` +
+        `<button class="history-item-feedback btn btn-ghost btn-sm" data-regid="${escapeHtml(reg.regId)}">Submit Feedback</button>` +
+        `<button class="history-item-download btn btn-ghost btn-sm" data-regid="${escapeHtml(reg.regId)}">Download Certificate</button>` +
+      `</div>`;
     list.appendChild(item);
   });
 
   // Wire certificate downloads
-  list.querySelectorAll(".history-item-certificate").forEach((el) => {
+  list.querySelectorAll(".history-item-download").forEach((el) => {
     el.addEventListener("click", () => {
       const regId = el.dataset.regid;
       if (typeof window.CertificateModule?.generateCertificate === "function") {
@@ -472,10 +475,28 @@ const renderHistory = () => {
       }
     });
   });
+
+  // Wire feedback submissions
+  list.querySelectorAll(".history-item-feedback").forEach((el) => {
+    el.addEventListener("click", () => {
+      const regId = el.dataset.regid;
+      const reg = regs.find((r) => r.regId === regId);
+      if (!reg) {
+        window.showToast("Registration not found.", "error");
+        return;
+      }
+      showTab("feedback");
+      // Pre-select the feedback dialog's event field if wired externally.
+      if (typeof window.showToast === "function") {
+        window.showToast(`Ready to submit feedback for registration ${regId}.`, "info");
+      }
+    });
+  });
 };
 
 const app = {
   showTab,
+  renderHistory,
   seedDemoData: (force = false) => {
     try {
       StorageService.seedDemoData(force);
@@ -495,6 +516,14 @@ const app = {
 };
 
 window.app = app;
+
+// Expose renderHistory on PassesModule / RegistrationModule for cross-module access.
+if (window.PassesModule) {
+  window.PassesModule.renderHistory = renderHistory;
+}
+if (window.RegistrationModule) {
+  window.RegistrationModule.renderHistory = renderHistory;
+}
 
 // ─── Bootstrapper ──────────────────────────────────────────────────────────
 
