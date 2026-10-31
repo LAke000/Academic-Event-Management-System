@@ -335,7 +335,9 @@ const renderDashboardStats = () => {
   try {
     const events = StorageService.getEvents();
     const registrations = StorageService.getRegistrations();
-    const attended = registrations.filter((r) => r.status === "Present").length;
+    const attended = registrations.filter(
+      (r) => r.status === "Present" || (r.attendance && r.attendance.status === "Present")
+    ).length;
     const feedbackCount = StorageService.getFeedback().length;
 
     const set = (id, value) => {
@@ -346,6 +348,9 @@ const renderDashboardStats = () => {
     set("stat-registrations", registrations.length);
     set("stat-present", attended);
     set("stat-feedback", feedbackCount);
+
+    const dashEmpty = document.getElementById("dashboard-empty");
+    if (dashEmpty) dashEmpty.hidden = events.length > 0;
   } catch (err) {
     console.error("[app] Failed to render dashboard stats:", err);
   }
