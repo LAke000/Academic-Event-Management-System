@@ -182,6 +182,7 @@ const toggleAdminTabs = (show) => {
     .forEach((link) => {
       if (ADMIN_TABS.includes(link.dataset.tab)) {
         link.hidden = !show;
+        link.style.display = show ? "" : "none";
         if (!show) {
           link.setAttribute("aria-hidden", "true");
           link.removeAttribute("aria-current");
@@ -228,6 +229,12 @@ const applyRole = (role) => {
   setBodyRole(role);
   toggleAdminTabs(isAdmin);
   updateProfileChip(role);
+
+  const seedTop = document.getElementById("btn-seed-data");
+  if (seedTop) {
+    seedTop.hidden = !isAdmin;
+    seedTop.style.display = isAdmin ? "" : "none";
+  }
 
   try {
     StorageService.setActiveRole(role);

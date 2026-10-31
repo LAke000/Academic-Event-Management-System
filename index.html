@@ -27,7 +27,7 @@
         <span class="toggle-slider"></span>
         <span class="toggle-label admin-label">Admin Mode</span>
       </label>
-      <button class="btn btn-ghost btn-sm" id="btn-seed-data" title="Load Demo Academic Data">
+      <button class="btn btn-ghost btn-sm admin-only" id="btn-seed-data" title="Load Demo Academic Data">
         <span class="btn-icon">&#128202;</span> Seed Demo Data
       </button>
       <div class="profile-chip" id="profile-chip">
@@ -104,7 +104,7 @@
           <p>There are no events to display. Ask an organizer to create one, or seed demo academic data to explore the portal.</p>
           <div class="empty-actions">
             <button class="btn btn-primary" onclick="app.seedDemoData()">Load Demo Academic Data</button>
-            <button class="btn btn-ghost" onclick="app.showTab('dashboard')">View Admin Dashboard</button>
+            <button class="btn btn-ghost admin-only" onclick="app.showTab('dashboard')">View Admin Dashboard</button>
           </div>
         </div>
         <div id="discover-list" class="events-grid">
