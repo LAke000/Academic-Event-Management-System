@@ -401,23 +401,26 @@ input, select, textarea {
 }
 
 /* App Layout Wrapper — Sidebar + Main Viewport */
-.app-shell {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: auto 1fr;
+.app-layout {
+  display: flex;
+  flex-direction: row;
   min-height: 100vh;
+  width: 100%;
+  position: relative;
+  background: #f8fafc;
 }
 
 .sidebar {
-  position: fixed;
-  top: var(--header-height);
-  width: var(--sidebar-width);
-  height: calc(100vh - var(--header-height));
-  background-color: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   overflow-y: auto;
-  z-index: 50;
-  transition: transform var(--transition-base);
+  z-index: 100;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
 }
 
 .sidebar-header {
@@ -481,11 +484,13 @@ input, select, textarea {
   flex-shrink: 0;
 }
 
-.main-viewport {
-  margin-left: var(--sidebar-width);
-  padding: var(--space-xl);
-  min-height: calc(100vh - var(--header-height));
+.main-content {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  padding: 2rem;
   overflow-y: auto;
+  background: #f8fafc;
 }
 
 /* Page header for each view */
@@ -689,16 +694,9 @@ input, select, textarea {
     --sidebar-width: 240px;
   }
 
-  .app-shell {
-    grid-template-columns: 240px 1fr;
-  }
-
   .sidebar {
     width: 240px;
-  }
-
-  .main-viewport {
-    margin-left: 240px;
+    min-width: 240px;
   }
 
   .nav-link {
@@ -726,10 +724,6 @@ input, select, textarea {
 }
 
 @media (max-width: 768px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
   .sidebar {
     position: fixed;
     top: var(--header-height);
@@ -748,8 +742,7 @@ input, select, textarea {
     transform: translateY(0);
   }
 
-  .main-viewport {
-    margin-left: 0;
+  .main-content {
     padding: var(--space-lg);
   }
 
@@ -808,7 +801,7 @@ input, select, textarea {
     padding: 0 var(--space-sm);
   }
 
-  .main-viewport {
+  .main-content {
     padding: var(--space-md);
   }
 
