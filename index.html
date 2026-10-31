@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Campus Event Portal - Academic Event Registration System for University Events">
+  <meta name="author" content="Mr. Lake">
+  <title>Campus Event Portal | Academic Event Registration System</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/print.css">
+  <!-- Third-Party CDNs (pure vanilla, per project specification) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-mark">CEP</span>
+      <span class="brand-name">Campus Event Portal</span>
+    </div>
+    <div class="top-actions">
+      <label class="role-toggle" aria-label="Switch between Student Mode and Admin Mode">
+        <span class="toggle-label student-label">Student Mode</span>
+        <input type="checkbox" id="role-toggle" class="toggle-input" role="switch" aria-checked="false">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label admin-label">Admin Mode</span>
+      </label>
+      <button class="btn btn-ghost btn-sm" id="btn-seed-data" title="Load Demo Academic Data">
+        <span class="btn-icon">&#128202;</span> Seed Demo Data
+      </button>
+      <div class="profile-chip" id="profile-chip">
+        <span class="chip-avatar" id="chip-avatar">S</span>
+        <div class="chip-info">
+          <span class="chip-name" id="chip-name">Student Mode</span>
+          <span class="chip-status" id="chip-status">Not registered for any event</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-brand">Campus Event Portal</span>
+        <span class="sidebar-divider"></span>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <h3 class="nav-section">Student Portal</h3>
+        <a href="#discover" class="nav-link active" data-tab="discover" aria-controls="discover" aria-current="page">
+          <span class="nav-icon">&#128209;</span>
+          <span class="nav-text">Discover Events</span>
+        </a>
+        <a href="#passes" class="nav-link" data-tab="passes" aria-controls="passes">
+          <span class="nav-icon">&#128274;</span>
+          <span class="nav-text">My Passes</span>
+        </a>
+        <a href="#history" class="nav-link" data-tab="history" aria-controls="history">
+          <span class="nav-icon">&#128197;</span>
+          <span class="nav-text">History & Certificates</span>
+        </a>
+        <h3 class="nav-section">Admin / Organizer</h3>
+        <a href="#dashboard" class="nav-link" data-tab="dashboard" aria-controls="dashboard">
+          <span class="nav-icon">&#128198;</span>
+          <span class="nav-text">Dashboard & Quick Seed</span>
+        </a>
+        <a href="#events" class="nav-link" data-tab="events" aria-controls="events">
+          <span class="nav-icon">&#128221;</span>
+          <span class="nav-text">Manage Events</span>
+        </a>
+        <a href="#roster" class="nav-link" data-tab="roster" aria-controls="roster">
+          <span class="nav-icon">&#128104;</span>
+          <span class="nav-text">Registrant Roster</span>
+        </a>
+        <a href="#scanner" class="nav-link" data-tab="scanner" aria-controls="scanner">
+          <span class="nav-icon">&#128273;</span>
+          <span class="nav-text">Live QR Scanner</span>
+        </a>
+        <a href="#feedback" class="nav-link" data-tab="feedback" aria-controls="feedback">
+          <span class="nav-icon">&#128078;</span>
+          <span class="nav-text">Feedback Reviews</span>
+        </a>
+        <a href="#reports" class="nav-link" data-tab="reports" aria-controls="reports">
+          <span class="nav-icon">&#128203;</span>
+          <span class="nav-text">Reports & CSV Export</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <hr class="sidebar-divider">
+        <p class="sidebar-note">Pure Vanilla JS</p>
+        <p class="sidebar-note sidebar-note-small">localStorage database</p>
+        <p class="sidebar-note sidebar-note-small">No backend &middot; No build tools</p>
+      </div>
+    </aside>
+
+    <main class="main-viewport" id="main-viewport">
+      <!-- ============================ DISCOVER EVENTS ============================ -->
+      <section class="tab-pane active" id="discover" aria-labelledby="tab-discover">
+        <div class="page-header">
+          <h1>Discover Events</h1>
+          <p class="page-subtitle">Browse upcoming academic events and register to attend.</p>
+        </div>
+        <div id="discover-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128197;</div>
+          <h2>No Events Created Yet</h2>
+          <p>There are no events to display. Ask an organizer to create one, or seed demo academic data to explore the portal.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="app.seedDemoData()">Load Demo Academic Data</button>
+            <button class="btn btn-ghost" onclick="app.showTab('dashboard')">View Admin Dashboard</button>
+          </div>
+        </div>
+        <div id="discover-list" class="events-grid">
+          <!-- Event cards are injected here by events.js -->
+        </div>
+      </section>
+
+      <!-- ============================ MY PASSES ============================ -->
+      <section class="tab-pane" id="passes" aria-labelledby="tab-passes">
+        <div class="page-header">
+          <h1>My Passes</h1>
+          <p class="page-subtitle">Your registered event passes and digital QR entry passes.</p>
+        </div>
+        <div id="passes-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128274;</div>
+          <h2>No Registered Passes</h2>
+          <p>You haven't registered for any events yet. Browse events and register to receive your digital QR entry pass.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="app.showTab('discover')">Browse Events</button>
+          </div>
+        </div>
+        <div id="passes-list" class="passes-grid">
+          <!-- Pass cards are injected here by registration.js -->
+        </div>
+      </section>
+
+      <!-- ============================ HISTORY & CERTIFICATES ============================ -->
+      <section class="tab-pane" id="history" aria-labelledby="tab-history">
+        <div class="page-header">
+          <h1>History & Certificates</h1>
+          <p class="page-subtitle">View your attendance history and download participation certificates.</p>
+        </div>
+        <div id="history-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128197;</div>
+          <h2>No Attendance History</h2>
+          <p>Attend an event and get checked in as Present to unlock your certificate of participation.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="app.showTab('discover')">Browse Events</button>
+          </div>
+        </div>
+        <div id="history-list" class="history-list">
+          <!-- History rows are injected here by registration.js -->
+        </div>
+      </section>
+
+      <!-- ============================ DASHBOARD & QUICK SEED ============================ -->
+      <section class="tab-pane" id="dashboard" aria-labelledby="tab-dashboard">
+        <div class="page-header">
+          <h1>Dashboard & Quick Seed</h1>
+          <p class="page-subtitle">Overview of events, registrations, and system data.</p>
+        </div>
+        <div class="stats-grid" id="dashboard-stats">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-events">0</span>
+            <span class="stat-label">Total Events</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-registrations">0</span>
+            <span class="stat-label">Registrations</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-present">0</span>
+            <span class="stat-label">Checked In</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-feedback">0</span>
+            <span class="stat-label">Feedback</span>
+          </div>
+        </div>
+        <div class="dashboard-actions">
+          <button class="btn btn-primary" id="btn-load-demo">Load Demo Academic Data</button>
+          <button class="btn btn-ghost" id="btn-clear-data">Clear All Data</button>
+        </div>
+        <div id="dashboard-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128198;</div>
+          <h2>No Events Yet</h2>
+          <p>Seed demo data to explore the admin dashboard, or create your first academic event.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" id="btn-create-event-dash">Create Event</button>
+            <button class="btn btn-primary" id="btn-load-demo-dash">Load Demo Academic Data</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ MANAGE EVENTS ============================ -->
+      <section class="tab-pane" id="events" aria-labelledby="tab-events">
+        <div class="page-header">
+          <h1>Manage Events</h1>
+          <p class="page-subtitle">Create, edit, and publish academic events for student registration.</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="btn-create-event">Create Event</button>
+        </div>
+        <div id="events-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128221;</div>
+          <h2>No Events Created</h2>
+          <p>Create your first academic event to get started. Events appear here once published.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" id="btn-create-event-empty">Create Event</button>
+          </div>
+        </div>
+        <div id="events-list" class="events-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Event Title</th>
+                <th>Type</th>
+                <th>Department</th>
+                <th>Venue</th>
+                <th>Date &amp; Time</th>
+                <th>Capacity</th>
+                <th>Registered</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="events-table-body">
+              <!-- Event rows are injected here by events.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================ REGISTRANT ROSTER ============================ -->
+      <section class="tab-pane" id="roster" aria-labelledby="tab-roster">
+        <div class="page-header">
+          <h1>Registrant Roster</h1>
+          <p class="page-subtitle">View and manage student registrations across all events.</p>
+        </div>
+        <div id="roster-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128104;</div>
+          <h2>No Registrations</h2>
+          <p>No students have registered for events yet. Registrations appear here once students sign up.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="app.showTab('events')">Manage Events</button>
+          </div>
+        </div>
+        <div id="roster-list" class="events-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Registration ID</th>
+                <th>Student Name</th>
+                <th>Registration No.</th>
+                <th>Event</th>
+                <th>Email</th>
+                <th>Attendance</th>
+                <th>Check-In Time</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="roster-table-body">
+              <!-- Roster rows are injected here by attendance.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================ LIVE QR SCANNER ============================ -->
+      <section class="tab-pane" id="scanner" aria-labelledby="tab-scanner">
+        <div class="page-header">
+          <h1>Live QR Scanner</h1>
+          <p class="page-subtitle">Scan student QR entry passes at the venue door using the webcam.</p>
+        </div>
+        <div class="scanner-intro card">
+          <p>Position the student's QR pass within the camera frame. On a successful scan, the attendee is checked in automatically and the roster updates to Present.</p>
+          <div class="scanner-controls">
+            <button class="btn btn-primary" id="btn-start-scanner">Start Camera</button>
+            <button class="btn btn-ghost" id="btn-stop-scanner" disabled>Stop Camera</button>
+          </div>
+        </div>
+        <div id="scanner-view" class="scanner-view" hidden>
+          <div id="reader" class="reader">Camera feed will appear here</div>
+          <div id="scan-toast" class="scan-toast" hidden>
+            <span class="toast-icon">&#10004;</span>
+            <span class="toast-message" id="scan-toast-message">Checked in successfully</span>
+          </div>
+        </div>
+        <div id="scanner-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128273;</div>
+          <h2>Scanner Not Active</h2>
+          <p>Click Start Camera to begin live QR scanning at the venue door.</p>
+        </div>
+      </section>
+
+      <!-- ============================ FEEDBACK REVIEWS ============================ -->
+      <section class="tab-pane" id="feedback" aria-labelledby="tab-feedback">
+        <div class="page-header">
+          <h1>Feedback Reviews</h1>
+          <p class="page-subtitle">Review student feedback submitted after events.</p>
+        </div>
+        <div id="feedback-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128078;</div>
+          <h2>No Feedback Yet</h2>
+          <p>Feedback appears here after students attend events marked as Present and submit their reviews.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="app.showTab('events')">Manage Events</button>
+          </div>
+        </div>
+        <div id="feedback-list" class="feedback-list">
+          <!-- Feedback cards are injected here by feedback.js -->
+        </div>
+      </section>
+
+      <!-- ============================ REPORTS & CSV EXPORT ============================ -->
+      <section class="tab-pane" id="reports" aria-labelledby="tab-reports">
+        <div class="page-header">
+          <h1>Reports &amp; CSV Export</h1>
+          <p class="page-subtitle">Export attendance and registration data, and view turnout analytics.</p>
+        </div>
+        <div class="report-actions">
+          <button class="btn btn-primary" id="btn-export-registrations">Export Registrations CSV</button>
+          <button class="btn btn-primary" id="btn-export-attendance">Export Attendance CSV</button>
+          <button class="btn btn-primary" id="btn-export-feedback">Export Feedback CSV</button>
+        </div>
+        <div class="chart-card">
+          <canvas id="attendanceChart"></canvas>
+        </div>
+        <div id="reports-empty" class="empty-state" hidden>
+          <div class="empty-icon">&#128203;</div>
+          <h2>No Data to Report</h2>
+          <p>Seed demo data to generate reports, charts, and CSV exports.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" id="btn-load-demo-reports">Load Demo Academic Data</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="alert" aria-live="polite">
+    <span class="toast-message" id="toast-message">Action completed</span>
+  </div>
+
+  <!-- ============================ DIALOG: CREATE EVENT ============================ -->
+  <dialog id="event-create-dialog" class="dialog">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2>Create Event</h2>
+        <button class="dialog-close" aria-label="Close dialog">&times;</button>
+      </header>
+      <form id="event-create-form">
+        <div class="form-grid">
+          <div class="form-field full-width">
+            <label class="form-label" for="event-title">Event Title</label>
+            <input type="text" id="event-title" name="title" required placeholder="e.g. State-of-the-Art Deep Learning" maxlength="100">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-type">Event Type</label>
+            <select id="event-type" name="type" required>
+              <option value="Workshop">Workshop</option>
+              <option value="Seminar">Seminar</option>
+              <option value="Conference">Conference</option>
+              <option value="Guest Lecture">Guest Lecture</option>
+              <option value="Hackathon">Hackathon</option>
+              <option value="Symposium">Symposium</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-department">Department</label>
+            <input type="text" id="event-department" name="department" required placeholder="e.g. Department of CSE" maxlength="80">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-venue">Venue</label>
+            <input type="text" id="event-venue" name="venue" required placeholder="e.g. Audi-3, Block 34" maxlength="80">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-datetime">Date &amp; Time</label>
+            <input type="datetime-local" id="event-datetime" name="dateTime" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-capacity">Seat Capacity</label>
+            <input type="number" id="event-capacity" name="capacity" required min="1" max="500" placeholder="e.g. 60">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-speaker">Speaker / Faculty Coordinator</label>
+            <input type="text" id="event-speaker" name="speaker" required placeholder="e.g. Dr. A. Sharma" maxlength="100">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="event-deadline">Registration Deadline</label>
+            <input type="datetime-local" id="event-deadline" name="deadline" required>
+          </div>
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-event">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Event</button>
+        </footer>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ============================ DIALOG: DIGITAL BOARDING PASS ============================ -->
+  <dialog id="pass-dialog" class="dialog dialog-wide">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2>Digital Entry Pass</h2>
+        <button class="dialog-close" aria-label="Close dialog">&times;</button>
+      </header>
+      <div class="pass-layout">
+        <div class="pass-info">
+          <div class="pass-badge" id="pass-badge">Registered</div>
+          <h3 id="pass-title"></h3>
+          <p class="pass-meta"><span>&#128209;</span> <span id="pass-department"></span></p>
+          <p class="pass-meta"><span>&#128197;</span> <span id="pass-venue"></span></p>
+          <p class="pass-meta"><span>&#128198;</span> <span id="pass-datetime"></span></p>
+          <p class="pass-meta"><span>&#128100;</span> <span id="pass-studentid"></span></p>
+          <p class="pass-meta"><span>&#9993;</span> <span id="pass-email"></span></p>
+          <p class="pass-regid" id="pass-regid"></p>
+          <p class="pass-note">Present this QR code at the venue door for check-in.</p>
+        </div>
+        <div class="pass-qr">
+          <div id="qrcode-target"></div>
+          <p class="pass-qr-caption">QR Entry Pass</p>
+        </div>
+      </div>
+      <footer class="dialog-footer">
+        <button class="btn btn-ghost" id="btn-print-pass">Print Pass</button>
+        <button class="btn btn-primary" id="btn-close-pass">Close</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- ============================ DIALOG: ATTENDANCE SCANNER ============================ -->
+  <dialog id="scanner-dialog" class="dialog dialog-wide">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2>Live QR Scanner</h2>
+        <button class="dialog-close" aria-label="Close scanner dialog">&times;</button>
+      </header>
+      <div class="scanner-dialog-body">
+        <div class="scanner-preview-wrap">
+          <div class="reader"></div>
+          <div class="camera-controls">
+            <button class="btn btn-ghost btn-sm" id="btn-camera-toggle">Switch Camera</button>
+          </div>
+        </div>
+        <div class="scanner-manual">
+          <h3>Manual Check-In</h3>
+          <div class="form-field compact">
+            <label class="form-label">Search Registration No.</label>
+            <input type="text" id="manual-checkin-search" placeholder="e.g. 12601928">
+          </div>
+          <button class="btn btn-primary" id="btn-manual-checkin">Check In Student</button>
+        </div>
+        <div id="scan-toast-dialog" class="scan-toast" hidden>
+          <span class="toast-icon">&#10004;</span>
+          <span class="toast-message" id="scan-toast-dialog-message">Checked in successfully</span>
+        </div>
+        <div id="scanner-override-list" class="override-table-wrap">
+          <table class="data-table compact">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Registration No.</th>
+                <th>Event</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="scanner-override-body">
+              <!-- Override rows injected by attendance.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <footer class="dialog-footer">
+        <button class="btn btn-ghost" id="btn-stop-scanner-dialog">Stop Scanner</button>
+        <button class="btn btn-primary" id="btn-close-scanner">Close</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- ============================ DIALOG: FEEDBACK ============================ -->
+  <dialog id="feedback-dialog" class="dialog">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2>Event Feedback</h2>
+        <button class="dialog-close" aria-label="Close feedback dialog">&times;</button>
+      </header>
+      <form id="feedback-form">
+        <input type="hidden" name="eventId">
+        <div class="form-field">
+          <label class="form-label">How would you rate this event?</label>
+          <div class="star-rating" id="star-rating">
+            <input type="radio" name="rating" id="star5" value="5"><label for="star5" class="star-label">&#9733;</label>
+            <input type="radio" name="rating" id="star4" value="4"><label for="star4" class="star-label">&#9733;</label>
+            <input type="radio" name="rating" id="star3" value="3"><label for="star3" class="star-label">&#9733;</label>
+            <input type="radio" name="rating" id="star2" value="2"><label for="star2" class="star-label">&#9733;</label>
+            <input type="radio" name="rating" id="star1" value="1"><label for="star1" class="star-label">&#9733;</label>
+          </div>
+          <p class="form-hint" id="star-hint">Select a rating to continue.</p>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Comments</label>
+          <textarea name="comments" id="feedback-comments" rows="5" placeholder="Share your experience about this event..."></textarea>
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-feedback">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-feedback" disabled>Submit Feedback</button>
+        </footer>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ============================ DIALOG: CERTIFICATE ============================ -->
+  <dialog id="certificate-dialog" class="dialog dialog-wide">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2>Certificate of Participation</h2>
+        <button class="dialog-close" aria-label="Close certificate dialog">&times;</button>
+      </header>
+      <div class="certificate-body">
+        <canvas id="certCanvas" width="1000" height="700"></canvas>
+      </div>
+      <footer class="dialog-footer">
+        <button class="btn btn-ghost" id="btn-close-cert">Close</button>
+        <button class="btn btn-primary" id="btn-download-cert">Download Certificate (PNG)</button>
+        <button class="btn btn-ghost" id="btn-print-cert">Print Certificate</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/storage.js"></script>
+  <script type="module" src="js/events.js"></script>
+  <script type="module" src="js/registration.js"></script>
+  <script type="module" src="js/attendance.js"></script>
+  <script type="module" src="js/feedback.js"></script>
+  <script type="module" src="js/certificate.js"></script>
+  <script type="module" src="js/reports.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

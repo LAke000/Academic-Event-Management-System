@@ -1,0 +1,303 @@
+/* ============================================================
+   Academic Event Registration System — css/print.css
+   @media print engine for Digital Passes & Certificates
+   Zero-truncation, pure vanilla CSS3, no placeholders.
+   ============================================================ */
+
+@media print {
+  /* 1. Page Setup & Print Normalization */
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html {
+    background-color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* 2. Isolation Rules — suppress entire UI chrome */
+  header.top-bar,
+  aside.sidebar,
+  .top-actions,
+  .profile-chip,
+  .role-toggle,
+  .btn,
+  button,
+  input,
+  select,
+  textarea,
+  dialog,
+  .scanner-view,
+  .scanner-intro,
+  .scanner-controls,
+  .page-actions,
+  .report-actions,
+  .dashboard-actions,
+  #toast,
+  .toast,
+  footer,
+  nav,
+  aside {
+    display: none !important;
+  }
+
+  main.main-viewport {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background-color: #ffffff !important;
+  }
+
+  section.tab-pane {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: auto;
+  }
+
+  .pass-layout,
+  .certificate-body,
+  .pass-card,
+  .dialog-panel {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Ensure only the intended print target is visible per context */
+  #pass-dialog,
+  #certificate-dialog {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background-color: #ffffff !important;
+  }
+
+  #pass-dialog .dialog-panel,
+  #certificate-dialog .dialog-panel {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background-color: #ffffff !important;
+  }
+
+  #pass-dialog .dialog-header,
+  #certificate-dialog .dialog-header,
+  #pass-dialog .dialog-footer,
+  #certificate-dialog .dialog-footer,
+  #pass-dialog .dialog-close,
+  #certificate-dialog .dialog-close,
+  #btn-print-pass,
+  #btn-close-pass,
+  #btn-stop-scanner-dialog,
+  #btn-close-scanner,
+  #btn-close-cert,
+  #btn-download-cert,
+  #btn-print-cert {
+    display: none !important;
+  }
+
+  /* 3. Pass & Certificate Formatting */
+
+  /* Digital Pass print layout */
+  #pass-dialog .pass-layout {
+    flex-direction: column !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #pass-dialog .pass-info {
+    border: 2px solid #000000 !important;
+    border-radius: 0 !important;
+    padding: 14pt !important;
+    background-color: #ffffff !important;
+    min-width: 0 !important;
+  }
+
+  #pass-dialog .pass-badge {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-radius: 0 !important;
+    font-size: 8pt !important;
+    padding: 2pt 6pt !important;
+    margin-bottom: 8pt !important;
+    display: inline-block !important;
+  }
+
+  #pass-dialog .pass-layout h3 {
+    font-size: 14pt !important;
+    margin: 0 0 6pt 0 !important;
+    color: #000000 !important;
+  }
+
+  #pass-dialog .pass-meta {
+    font-size: 9.5pt !important;
+    color: #000000 !important;
+    margin: 3pt 0 !important;
+    border-bottom: 0.5pt solid #e2e8f0 !important;
+    padding-bottom: 3pt !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #pass-dialog .pass-qr {
+    margin-top: 10pt !important;
+    align-items: center !important;
+  }
+
+  #pass-dialog #qrcode-target {
+    width: 140px !important;
+    height: 140px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #000000 !important;
+    padding: 4pt !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+  }
+
+  #pass-dialog .pass-qr-caption {
+    font-size: 8pt !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
+    margin-top: 4pt !important;
+    text-align: center !important;
+  }
+
+  #pass-dialog .pass-note {
+    font-size: 8pt !important;
+    color: #334155 !important;
+    margin-top: 8pt !important;
+    font-style: normal !important;
+    text-align: center !important;
+  }
+
+  /* Canvas Certificate print — landscape orientation */
+  #certificate-dialog {
+    size: landscape;
+  }
+
+  @page certificate {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  #certificate-dialog .certificate-body {
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    min-height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #certificate-dialog #certCanvas {
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    border: 2pt solid #1e3a8a !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background-color: #ffffff !important;
+    display: block !important;
+    margin: 0 auto !important;
+  }
+
+  /* Remove screen-only shadows and dialog overlays for print */
+  .shadow-lg,
+  .shadow-md,
+  .shadow-sm,
+  .shadow-glow {
+    box-shadow: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    border: 0.5pt solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+  }
+
+  /* Ensure QR codes render crisply in print */
+  #qrcode-target canvas,
+  #qrcode-target svg,
+  #qrcode-target img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    background-color: #ffffff !important;
+  }
+
+  /* Hide any screen-only interactive indicators */
+  [hidden],
+  .hidden {
+    display: none !important;
+  }
+
+  .status-badge {
+    border: 0.5pt solid currentColor !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page break control */
+  .avoid-break,
+  .no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .force-break {
+    page-break-before: always;
+    break-before: always;
+  }
+
+  /* Print-only margin adjustments for content sections */
+  section.tab-pane h1,
+  section.tab-pane h2 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .data-table {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .data-table thead {
+    display: table-header-group !important;
+  }
+}
