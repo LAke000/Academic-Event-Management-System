@@ -493,6 +493,11 @@ input, select, textarea {
   background: #f8fafc;
 }
 
+/* Strict role access scoping — Student Mode hides all admin-only UI. */
+body.role-student .admin-only {
+  display: none !important;
+}
+
 /* Page header for each view */
 .page-header {
   margin-bottom: var(--space-xl);
