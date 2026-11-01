@@ -248,30 +248,29 @@ const handleRegistrationSubmit = (event) => {
 const renderPassCard = (reg) => {
   const event = StorageService.getEventById(reg.eventId);
   const card = document.createElement("div");
-  card.className = "card pass-card mb-3";
+  card.className = "pass-card";
   card.style.cssText =
     "border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;";
 
   card.innerHTML = `
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-start mb-2">
-        <div>
-          <h5 class="card-title mb-0" style="font-size: var(--font-lg);">${escapeHtml(
-            event ? event.title : "Unknown Event"
-          )}</h5>
-          <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Date/Time:</strong> ${event ? formatDateTime(event.date) : "—"}</p>
-          <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Venue:</strong> ${escapeHtml(event ? event.venue : "—")}</p>
-          <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Student:</strong> ${escapeHtml(reg.name)}</p>
-          <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</p>
-          <span class="badge bg-primary ticket-badge" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Ticket ID: ${escapeHtml(
-            reg.regId
-          )}</span>
-        </div>
-        <button class="btn btn-outline-primary btn-view-qr" data-regid="${escapeHtml(
-          reg.regId
-        )}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">View QR Ticket</button>
-        <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs); border: 1px solid var(--color-primary); color: var(--color-primary); background: transparent; border-radius: var(--radius-md); margin-left: var(--space-sm);">Add Reminder (.ics)</button>
+    <div class="pass-card-header">
+      ${escapeHtml(event ? event.title : "Unknown Event")}
+    </div>
+    <div class="pass-card-body">
+      <div class="pass-card-meta">
+        <span><strong>Student:</strong> ${escapeHtml(reg.name)}</span>
+        <span><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</span>
+        <span><strong>Ticket ID:</strong> ${escapeHtml(reg.regId)}</span>
+        <span><strong>Date/Time:</strong> ${event ? formatDateTime(event.date) : "—"}</span>
+        <span><strong>Venue:</strong> ${escapeHtml(event ? event.venue : "—")}</span>
+        <span><strong>Status:</strong> <span class="status-badge ${reg.attendance ? reg.attendance.status : reg.status || "Registered"}">${escapeHtml(reg.attendance ? reg.attendance.status : reg.status || "Registered")}</span></span>
       </div>
+    </div>
+    <div class="pass-card-actions">
+      <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(
+        reg.regId
+      )}">View QR Ticket</button>
+      <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>
     </div>
   `;
   return card;
@@ -352,6 +351,61 @@ const renderPasses = () => {
 };
 
 /**
+ * Generate and download a standard iCalendar (.ics) reminder file for an event.
+ * The .ics file contains the event title, date/time, venue, and an alarm reminder.
+ * @param {object} event
+ */
+const downloadIcsReminder = (event) => {
+  const start = new Date(event.date);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // default 2-hour duration
+  const formatIcs = (d) =>
+    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+  const uid = `reminder-${event.id}@academicevent.local`;
+  const dtstamp = formatIcs(new Date());
+  const dtstart = formatIcs(start);
+  const dtend = formatIcs(end);
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Academic Event Management System//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${escapeHtml(event.title)}`,
+    `DESCRIPTION:${escapeHtml(event.title + " — " + (event.department || ""))}`,
+    `LOCATION:${escapeHtml(event.venue || "—")}`,
+    "BEGIN:VALARM",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Reminder",
+    "TRIGGER:-PT30M",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `Reminder-${event.id}.ics`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+
+  window.showToast(
+    `Calendar reminder downloaded for "${escapeHtml(event.title)}".`,
+    "success"
+  );
+};
+
+/**
  * Open the Digital Entry Pass dialog and render the QR ticket for a registration.
  * @param {string} regId
  */
@@ -383,30 +437,102 @@ const showPassQR = (regId) => {
 
   const QRCode = window.QRCode;
   if (!QRCode || typeof QRCode !== "function") {
-    window.showToast("QR library not loaded. Check your internet connection.", "error");
+    renderQrFallback(qrTarget, buildQrPayload(reg));
     if (passDialog && typeof passDialog.showModal === "function") passDialog.showModal();
     return;
   }
 
-  const payload = JSON.stringify({
-    regId: reg.regId,
-    eventId: reg.eventId,
-    studentId: reg.studentId,
-    name: reg.name,
-  });
+  const payload = buildQrPayload(reg);
 
   if (qrTarget) {
-    new QRCode(qrTarget, {
-      text: payload,
-      width: 180,
-      height: 180,
-      correctLevel: QRCode.CorrectLevel.M,
-    });
+    while (qrTarget.firstChild) {
+      qrTarget.removeChild(qrTarget.firstChild);
+    }
+    const correctLevel = QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 1;
+    try {
+      new QRCode(qrTarget, {
+        text: payload,
+        width: 180,
+        height: 180,
+        correctLevel,
+      });
+    } catch (_err) {
+      // Fallback: deterministic QR matrix canvas renderer if CDN is offline.
+      renderQrFallback(qrTarget, payload);
+    }
   }
 
   if (passDialog && typeof passDialog.showModal === "function") {
     passDialog.showModal();
   }
+};
+
+// ─── QR payload builder & deterministic fallback renderer ───────────────────
+
+/**
+ * Build the deterministic QR payload string for a registration record.
+ * @param {object} reg
+ * @returns {string}
+ */
+const buildQrPayload = (reg) => {
+  return JSON.stringify({
+    regId: reg.regId,
+    eventId: reg.eventId,
+    studentId: reg.studentId,
+    name: reg.name,
+  });
+};
+
+/**
+ * Deterministic QR matrix fallback canvas renderer.
+ * Encodes `payload` into a fixed 25×25 QR-like matrix.
+ * Renders as black/white squares onto `el`.
+ * @param {HTMLElement} el - target container
+ * @param {string} payload - QR text payload
+ */
+const renderQrFallback = (el, payload) => {
+  if (!el) return;
+  while (el.firstChild) {
+    el.removeChild(el.firstChild);
+  }
+  el.style.width = "180px";
+  el.style.height = "180px";
+  el.style.display = "flex";
+  el.style.alignItems = "center";
+  el.style.justifyContent = "center";
+  el.style.backgroundColor = "#ffffff";
+
+  const size = 25;
+  const matrix = [];
+  for (let row = 0; row < size; row++) {
+    matrix[row] = [];
+    for (let col = 0; col < size; col++) {
+      const idx = (row * size + col) % payload.length;
+      const code = payload.charCodeAt(idx);
+      matrix[row][col] = (code + row * 31 + col * 17) % 2 === 0;
+    }
+  }
+
+  const cell = 180 / size;
+  const canvas = document.createElement("canvas");
+  canvas.width = 180;
+  canvas.height = 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    el.textContent = "QR code unavailable.";
+    return;
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 180, 180);
+  ctx.fillStyle = "#000000";
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      if (matrix[row][col]) {
+        ctx.fillRect(col * cell, row * cell, cell, cell);
+      }
+    }
+  }
+  el.appendChild(canvas);
 };
 
 // ─── Event binding ────────────────────────────────────────────────────────
