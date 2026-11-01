@@ -83,9 +83,9 @@
     break-inside: avoid;
   }
 
-  /* Ensure only the intended print target is visible per context */
-  #pass-dialog,
-  #certificate-dialog {
+  /* Ensure only the intended print target is visible per context (open dialogs only) */
+  #pass-dialog[open],
+  #certificate-dialog[open] {
     display: block !important;
     position: static !important;
     width: 100% !important;

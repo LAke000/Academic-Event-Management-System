@@ -392,12 +392,15 @@ const renderAdminTable = () => {
     });
   });
 
-  // View roster for this event
+  // View roster for this event — open Roster tab pre-filtered to this event
   adminTableBody.querySelectorAll(".btn-view-roster").forEach((btn) => {
     btn.addEventListener("click", () => {
-      showTab("roster");
-      // Roster tab renders all registrations; filtering is handled by roster
-      // rendering when an event filter is present (kept simple: navigate only).
+      const eventId = btn.dataset.id;
+      if (typeof window.AttendanceModule?.filterRosterByEvent === "function") {
+        window.AttendanceModule.filterRosterByEvent(eventId);
+      } else {
+        showTab("roster");
+      }
     });
   });
 

@@ -444,7 +444,9 @@ const bindDataButtons = () => {
 
 /**
  * Render the student's attendance history into #history-list.
- * Only registrations marked "Present" appear, with certificate eligibility.
+ * Shows ALL student registrations (Present and Registered) with clear
+ * status badges and status-specific actions. Zero-truncation: no
+ * registration record is dropped.
  */
 const renderHistory = () => {
   const list = document.getElementById("history-list");
@@ -452,38 +454,91 @@ const renderHistory = () => {
   if (!list) return;
 
   const regs = StorageService.getRegistrations();
-  const present = regs.filter((r) => r.status === "Present");
+  const feedbacks = StorageService.getFeedback();
+
+  const hasFeedback = (reg) =>
+    feedbacks.some(
+      (f) => f.eventId === reg.eventId && f.studentId === reg.studentId
+    );
 
   list.innerHTML = "";
 
-  if (present.length === 0) {
+  if (regs.length === 0) {
     if (empty) empty.hidden = false;
     return;
   }
   if (empty) empty.hidden = true;
 
-  present.forEach((reg) => {
+  regs.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
+    const isPresent = reg.status === "Present";
     const item = document.createElement("div");
     item.className = "history-item card";
+
+    const headerDate = isPresent
+      ? formatDate(reg.checkInTime)
+      : (event ? formatDate(event.date) : "—");
+
+    const statusBadge = isPresent
+      ? `<span class="status-badge status-badge--present">Present</span>`
+      : `<span class="status-badge status-badge--registered">Registered (Attendance Pending)</span>`;
+
+    const metaLines = [
+      `<span><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</span>`,
+      `<span><strong>Department:</strong> ${escapeHtml(reg.department || "—")}</span>`,
+      `<span><strong>Status:</strong> ${statusBadge}</span>`,
+    ];
+
+    if (event && !isPresent) {
+      metaLines.push(
+        `<span><strong>Event Date:</strong> ${formatDate(event.date)}</span>`
+      );
+      metaLines.push(
+        `<span><strong>Venue:</strong> ${escapeHtml(event.venue)}</span>`
+      );
+    }
+
+    let actionsHtml = "";
+    if (isPresent) {
+      const feedbackSubmitted = hasFeedback(reg);
+      actionsHtml =
+        `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap;">` +
+        (feedbackSubmitted
+          ? `<span class="status-badge status-badge--present">Feedback Submitted ✓</span>`
+          : `<button class="history-item-feedback btn btn-ghost btn-sm" data-regid="${escapeHtml(
+              reg.regId
+            )}">Submit Feedback</button>`) +
+        `<button class="history-item-download btn btn-ghost btn-sm" data-regid="${escapeHtml(
+          reg.regId
+        )}">Download Certificate</button>` +
+        `</div>`;
+    } else {
+      actionsHtml =
+        `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center;">` +
+        `<button class="history-item-qr btn btn-ghost btn-sm" data-regid="${escapeHtml(
+          reg.regId
+        )}">View QR Pass</button>` +
+        `<p class="history-item-note" style="margin:0; font-size: var(--font-xs); color: var(--color-text-muted);">
+          Check in at the venue to unlock feedback &amp; certificate.
+        </p>` +
+        `</div>`;
+    }
+
     item.innerHTML =
       `<div class="history-item-header">` +
-        `<span class="history-item-title">${escapeHtml(event ? event.title : "Unknown Event")}</span>` +
-        `<span class="history-item-date">${formatDate(reg.checkInTime)}</span>` +
+        `<span class="history-item-title">${escapeHtml(
+          event ? event.title : "Unknown Event"
+        )}</span>` +
+        `<span class="history-item-date">${headerDate}</span>` +
       `</div>` +
       `<div class="history-item-meta">` +
-        `<span><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</span>` +
-        `<span><strong>Department:</strong> ${escapeHtml(reg.department || "—")}</span>` +
-        `<span><strong>Status:</strong> ${escapeHtml(reg.status)}</span>` +
+        metaLines.join("") +
       `</div>` +
-      `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap;">` +
-        `<button class="history-item-feedback btn btn-ghost btn-sm" data-regid="${escapeHtml(reg.regId)}">Submit Feedback</button>` +
-        `<button class="history-item-download btn btn-ghost btn-sm" data-regid="${escapeHtml(reg.regId)}">Download Certificate</button>` +
-      `</div>`;
+      actionsHtml;
     list.appendChild(item);
   });
 
-  // Wire certificate downloads
+  // Wire certificate downloads (Present only)
   list.querySelectorAll(".history-item-download").forEach((el) => {
     el.addEventListener("click", () => {
       const regId = el.dataset.regid;
@@ -510,6 +565,20 @@ const renderHistory = () => {
         window.FeedbackModule.openFeedbackDialog(reg.eventId, reg.studentId);
       } else {
         window.showToast("Feedback module unavailable.", "error");
+      }
+    });
+  });
+
+  // Wire QR pass viewing (Registered only)
+  list.querySelectorAll(".history-item-qr").forEach((el) => {
+    el.addEventListener("click", () => {
+      const regId = el.dataset.regid;
+      if (typeof window.RegistrationModule?.showPassQR === "function") {
+        window.RegistrationModule.showPassQR(regId);
+      } else if (typeof RegistrationModule?.showPassQR === "function") {
+        RegistrationModule.showPassQR(regId);
+      } else {
+        window.showToast("Registration module unavailable.", "error");
       }
     });
   });

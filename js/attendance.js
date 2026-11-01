@@ -30,6 +30,12 @@ const ROSTER_TABLE_BODY_ID = "roster-table-body";
 const ROSTER_EMPTY_ID = "roster-empty";
 const ROSTER_LIST_ID = "roster-list";
 
+// Roster filter toolbar
+const ROSTER_FILTER_TOOLBAR_ID = "roster-filter-toolbar";
+const ROSTER_SEARCH_INPUT_ID = "roster-search-input";
+const ROSTER_EVENT_FILTER_ID = "roster-event-filter";
+const ROSTER_STATUS_FILTER_ID = "roster-status-filter";
+
 // Live check‑in feed (scanner override table)
 const OVERRIDE_TABLE_BODY_ID = "scanner-override-body";
 
@@ -55,6 +61,15 @@ let rosterTableBody = null;
 let rosterEmpty = null;
 let rosterList = null;
 
+// Roster filter toolbar refs
+let rosterFilterToolbar = null;
+let rosterSearchInput = null;
+let rosterEventFilter = null;
+let rosterStatusFilter = null;
+
+// Roster filter state
+let rosterFilterState = { query: "", eventId: "", status: "" };
+
 const resolveRefs = () => {
   btnStartScanner = document.getElementById("btn-start-scanner");
   btnStopScanner = document.getElementById("btn-stop-scanner");
@@ -76,6 +91,11 @@ const resolveRefs = () => {
   rosterTableBody = document.getElementById(ROSTER_TABLE_BODY_ID);
   rosterEmpty = document.getElementById(ROSTER_EMPTY_ID);
   rosterList = document.getElementById(ROSTER_LIST_ID);
+
+  rosterFilterToolbar = document.getElementById(ROSTER_FILTER_TOOLBAR_ID);
+  rosterSearchInput = document.getElementById(ROSTER_SEARCH_INPUT_ID);
+  rosterEventFilter = document.getElementById(ROSTER_EVENT_FILTER_ID);
+  rosterStatusFilter = document.getElementById(ROSTER_STATUS_FILTER_ID);
 };
 
 // Resolve once at module load
@@ -413,21 +433,170 @@ const renderLiveCheckinFeed = () => {
   });
 };
 
-// ─── Roster tab rendering ─────────────────────────────────────────────────
+// ─── Roster filter toolbar ────────────────────────────────────────────────
+
 /**
- * Populate the Registrant Roster admin table with full registration data.
+ * Inject the .filter-toolbar above #roster-list when it is not already
+ * present in the DOM. Contains: search input, event filter dropdown,
+ * status filter dropdown. Safe to call repeatedly (idempotent).
+ */
+const ensureFilterToolbar = () => {
+  if (!rosterList) return;
+  if (rosterFilterToolbar) return;
+
+  const toolbar = document.createElement("div");
+  toolbar.id = ROSTER_FILTER_TOOLBAR_ID;
+  toolbar.className = "filter-toolbar";
+  toolbar.setAttribute("aria-label", "Filter registrant roster");
+
+  // 1. Search input
+  const searchLabel = document.createElement("label");
+  searchLabel.textContent = "Search";
+  searchLabel.style.cssText = "font-size: var(--font-xs); font-weight: 600; color: var(--color-text-secondary); white-space: nowrap;";
+  const searchInput = document.createElement("input");
+  searchInput.id = ROSTER_SEARCH_INPUT_ID;
+  searchInput.type = "text";
+  searchInput.placeholder = "Student Name, Roll No., Registration ID";
+  searchInput.className = "filter-input";
+  searchInput.style.cssText =
+    "padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 220px;";
+
+  // 2. Event filter dropdown
+  const eventLabel = document.createElement("label");
+  eventLabel.textContent = "Event";
+  eventLabel.style.cssText = "font-size: var(--font-xs); font-weight: 600; color: var(--color-text-secondary); white-space: nowrap;";
+  const eventSelect = document.createElement("select");
+  eventSelect.id = ROSTER_EVENT_FILTER_ID;
+  eventSelect.className = "filter-select";
+  eventSelect.style.cssText =
+    "padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 170px;";
+  const allEventsOpt = document.createElement("option");
+  allEventsOpt.value = "";
+  allEventsOpt.textContent = "All Events";
+  eventSelect.appendChild(allEventsOpt);
+
+  // 3. Status filter dropdown
+  const statusLabel = document.createElement("label");
+  statusLabel.textContent = "Status";
+  statusLabel.style.cssText = "font-size: var(--font-xs); font-weight: 600; color: var(--color-text-secondary); white-space: nowrap;";
+  const statusSelect = document.createElement("select");
+  statusSelect.id = ROSTER_STATUS_FILTER_ID;
+  statusSelect.className = "filter-select";
+  statusSelect.style.cssText =
+    "padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 150px;";
+  const allStatusOpt = document.createElement("option");
+  allStatusOpt.value = "";
+  allStatusOpt.textContent = "All Statuses";
+  statusSelect.appendChild(allStatusOpt);
+  const presentOpt = document.createElement("option");
+  presentOpt.value = "Present";
+  presentOpt.textContent = "Present";
+  statusSelect.appendChild(presentOpt);
+  const registeredOpt = document.createElement("option");
+  registeredOpt.value = "Registered";
+  registeredOpt.textContent = "Registered";
+  statusSelect.appendChild(registeredOpt);
+
+  toolbar.appendChild(searchLabel);
+  toolbar.appendChild(searchInput);
+  toolbar.appendChild(document.createTextNode(" "));
+  toolbar.appendChild(eventLabel);
+  toolbar.appendChild(eventSelect);
+  toolbar.appendChild(document.createTextNode(" "));
+  toolbar.appendChild(statusLabel);
+  toolbar.appendChild(statusSelect);
+
+  const parent = rosterList.parentElement;
+  if (parent) {
+    parent.insertBefore(toolbar, rosterList);
+  }
+
+  // Refresh refs after injection
+  resolveRefs();
+
+  // Wire filter events
+  searchInput.addEventListener("input", (e) => {
+    rosterFilterState.query = e.target.value;
+    renderRoster();
+  });
+  eventSelect.addEventListener("change", (e) => {
+    rosterFilterState.eventId = e.target.value;
+    renderRoster();
+  });
+  statusSelect.addEventListener("change", (e) => {
+    rosterFilterState.status = e.target.value;
+    renderRoster();
+  });
+};
+
+/**
+ * Apply current filter state to the full registration list.
+ * Filters by: search (name / studentId / regId), eventId, status.
+ * @returns {Array} filtered registrations
+ */
+const applyRosterFilters = (regs) => {
+  const { query, eventId, status } = rosterFilterState;
+  const term = query.toLowerCase().trim();
+  return regs.filter((reg) => {
+    if (eventId && reg.eventId !== eventId) return false;
+    if (status && reg.status !== status) return false;
+    if (term) {
+      const haystack = [
+        reg.name || "",
+        reg.studentId || "",
+        reg.regId || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(term)) return false;
+    }
+    return true;
+  });
+};
+
+/**
+ * Populate the event filter dropdown with options for all known events.
+ */
+const populateEventFilter = () => {
+  if (!rosterEventFilter) return;
+  const currentValue = rosterEventFilter.value;
+  const events = StorageService.getEvents();
+  // Keep existing "All Events" option; append any missing events.
+  const existing = [...rosterEventFilter.options].map((o) => o.value);
+  events.forEach((ev) => {
+    if (!existing.includes(ev.id)) {
+      const opt = document.createElement("option");
+      opt.value = ev.id;
+      opt.textContent = `${ev.title} (${ev.id})`;
+      rosterEventFilter.appendChild(opt);
+    }
+  });
+  rosterEventFilter.value = existing.includes(currentValue) ? currentValue : "";
+};
+
+/**
+ * Populate the Registrant Roster admin table with full registration data,
+ * honoring the current filter state (search / event / status).
  */
 const renderRoster = () => {
+  ensureFilterToolbar();
+  populateEventFilter();
+
   if (!rosterTableBody) return;
-  const regs = StorageService.getRegistrations();
+  const allRegs = StorageService.getRegistrations();
+  const regs = applyRosterFilters(allRegs);
+
+  const rosterListEl = rosterList;
+  const rosterEmptyEl = rosterEmpty;
 
   if (regs.length === 0) {
-    if (rosterEmpty) rosterEmpty.hidden = false;
-    if (rosterList) rosterList.hidden = true;
+    if (rosterEmptyEl) rosterEmptyEl.hidden = false;
+    if (rosterListEl) rosterListEl.hidden = true;
+    rosterTableBody.innerHTML = "";
     return;
   }
-  if (rosterEmpty) rosterEmpty.hidden = true;
-  if (rosterList) rosterList.hidden = false;
+  if (rosterEmptyEl) rosterEmptyEl.hidden = true;
+  if (rosterListEl) rosterListEl.hidden = false;
 
   rosterTableBody.innerHTML = "";
   regs.forEach((reg) => {
@@ -466,6 +635,21 @@ const renderRoster = () => {
       }
     });
   });
+};
+
+/**
+ * Pre-filter the roster to a specific event. Used when clicking "Roster"
+ * from the Manage Events admin table so the roster opens scoped to that event.
+ * @param {string} eventId
+ */
+AttendanceModule.filterRosterByEvent = (eventId) => {
+  if (!eventId) return;
+  rosterFilterState.eventId = eventId;
+  rosterFilterState.query = "";
+  rosterFilterState.status = "";
+  if (rosterSearchInput) rosterSearchInput.value = "";
+  if (rosterStatusFilter) rosterStatusFilter.value = "";
+  showTab("roster");
 };
 
 // ─── Utility: HTML escaping ───────────────────────────────────────────────
@@ -580,6 +764,7 @@ const AttendanceModule = {
   manualCheckIn,
   renderRoster,
   renderLiveCheckinFeed,
+  filterRosterByEvent,
 };
 
 // Expose to global scope for inline HTML handlers and cross‑module access
