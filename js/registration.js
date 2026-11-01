@@ -233,13 +233,23 @@ const handleRegistrationSubmit = (event) => {
   closeRegistrationModal();
   form.reset();
   window.showToast(`Registration successful! Ticket ID: ${regId}`, "success");
+  // Set the newly registered student as the active student context so their
+  // passes/history views are scoped to them automatically.
+  try {
+    StorageService.setActiveStudentId(studentId);
+  } catch (_err) {
+    // non-fatal
+  }
   renderPasses();
   try {
     if (typeof window.app?.updateProfileChip === "function") {
       window.app.updateProfileChip(StorageService.getActiveRole() || "student");
     }
+    if (typeof window.app?.renderHistory === "function") {
+      window.app.renderHistory();
+    }
   } catch (_err) {
-    // non-fatal: profile chip update is cosmetic
+    // non-fatal: profile chip / history update is cosmetic
   }
 };
 
@@ -282,7 +292,12 @@ const renderPassCard = (reg) => {
 const renderPasses = () => {
   if (!passesList || !passesEmpty) return;
 
-  const regs = StorageService.getRegistrations();
+  const activeStudentId = StorageService.getActiveStudentId();
+  const allRegs = StorageService.getRegistrations();
+  const regs =
+    activeStudentId === "ALL"
+      ? allRegs
+      : allRegs.filter((r) => r.studentId === activeStudentId);
   const reminders = StorageService.getReminders();
 
   // Render Upcoming Event Reminders banner at the top of My Passes

@@ -10,8 +10,10 @@ const FEEDBACK_KEY = "academic_feedback_db";
 const REMINDERS_KEY = "academic_reminders_db";
 const ROLE_KEY = "academic_active_role";
 const STUDENT_ID_KEY = "academic_active_student_id";
+const ACTIVE_STUDENT_KEY = "academic_active_student";
 
 const DEFAULT_ROLE = "student";
+const DEFAULT_ACTIVE_STUDENT_ID = "12601928";
 
 class StorageService {
   // ------------------------------------------------------------------
@@ -242,16 +244,17 @@ class StorageService {
   }
 
   /**
-   * Returns the active student ID used to scope student-owned views, or null
-   * when no student session is active.
-   * @returns {string|null}
+   * Returns the active student ID used to scope student-owned views.
+   * Defaults to "12601928" (Alice Kumar) when no student session is active.
+   * @returns {string}
    */
   static getActiveStudentId() {
-    return this._read(STUDENT_ID_KEY, null);
+    return this._read(STUDENT_ID_KEY, DEFAULT_ACTIVE_STUDENT_ID) || DEFAULT_ACTIVE_STUDENT_ID;
   }
 
   /**
-   * Persists the active student ID.
+   * Persists the active student ID. Accepts "ALL" (show all students) or a
+   * specific studentId (e.g. "12601928").
    * @param {string} studentId
    * @returns {boolean}
    */
@@ -262,6 +265,19 @@ class StorageService {
   // ------------------------------------------------------------------
   // Reset
   // ------------------------------------------------------------------
+
+  /**
+   * Clears all four data stores to empty arrays without reseeding, so an
+   * intentional blank-slate clear survives a non-forced seedDemoData(false)
+   * reload. Returns true only when all four writes succeed.
+   */
+  static clearAllData() {
+    const eventsOk = this._write(EVENTS_KEY, []);
+    const regsOk = this._write(REGISTRATIONS_KEY, []);
+    const feedbackOk = this._write(FEEDBACK_KEY, []);
+    const remindersOk = this._write(REMINDERS_KEY, []);
+    return eventsOk && regsOk && feedbackOk && remindersOk;
+  }
 
   /**
    * Clears all namespaced storage keys and re-runs the demo seeder (forced).
@@ -356,8 +372,13 @@ class StorageService {
         email: "alice.kumar@example.edu",
         department: "CSE",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Present",
         checkInTime: new Date().toISOString(),
+        attendance: {
+          status: "Present",
+          checkInTime: new Date().toISOString(),
+        },
       },
       {
         regId: "REG-8822",
@@ -367,8 +388,13 @@ class StorageService {
         email: "bob.singh@example.edu",
         department: "CSE",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Registered",
         checkInTime: null,
+        attendance: {
+          status: "Registered",
+          checkInTime: null,
+        },
       },
       {
         regId: "REG-8823",
@@ -378,8 +404,13 @@ class StorageService {
         email: "carol.lee@example.edu",
         department: "IT",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Present",
         checkInTime: new Date().toISOString(),
+        attendance: {
+          status: "Present",
+          checkInTime: new Date().toISOString(),
+        },
       },
       {
         regId: "REG-8824",
@@ -389,8 +420,13 @@ class StorageService {
         email: "david.patel@example.edu",
         department: "IT",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Registered",
         checkInTime: null,
+        attendance: {
+          status: "Registered",
+          checkInTime: null,
+        },
       },
       {
         regId: "REG-8825",
@@ -400,8 +436,13 @@ class StorageService {
         email: "eva.martinez@example.edu",
         department: "ME",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Registered",
         checkInTime: null,
+        attendance: {
+          status: "Registered",
+          checkInTime: null,
+        },
       },
       {
         regId: "REG-8826",

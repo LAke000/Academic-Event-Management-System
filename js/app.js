@@ -200,6 +200,67 @@ const toggleAdminTabs = (show) => {
   }
 };
 
+const buildStudentSwitcher = () => {
+  const switcher = document.getElementById("student-switcher");
+  if (switcher) return switcher;
+
+  const switcherEl = document.createElement("select");
+  switcherEl.id = "student-switcher";
+  switcherEl.setAttribute("aria-label", "Switch active student profile");
+  switcherEl.style.cssText =
+    "margin-left: var(--space-sm); padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-xs); background: var(--color-surface); color: var(--color-text-primary);";
+
+  const allOpt = document.createElement("option");
+  allOpt.value = "ALL";
+  allOpt.textContent = "All Demo Students";
+  switcherEl.appendChild(allOpt);
+
+  try {
+    const regs = StorageService.getRegistrations();
+    const seen = new Set();
+    regs.forEach((r) => {
+      if (r.studentId && !seen.has(r.studentId)) {
+        seen.add(r.studentId);
+        const opt = document.createElement("option");
+        opt.value = r.studentId;
+        opt.textContent = `${r.name || "Unknown"} (${r.studentId})`;
+        switcherEl.appendChild(opt);
+      }
+    });
+  } catch (_err) {
+    // non-fatal: student list is cosmetic
+  }
+
+  const activeId = StorageService.getActiveStudentId();
+  switcherEl.value = activeId || "ALL";
+
+  switcherEl.addEventListener("change", (e) => {
+    const selected = e.target.value;
+    try {
+      StorageService.setActiveStudentId(selected);
+    } catch (_err) {
+      // non-fatal
+    }
+    try {
+      updateProfileChip(StorageService.getActiveRole() || "student");
+    } catch (_err) {}
+    try {
+      EventsModule?.render?.();
+    } catch (_err) {}
+    try {
+      RegistrationModule?.renderPasses?.();
+    } catch (_err) {}
+    try {
+      renderHistory();
+    } catch (_err) {}
+    try {
+      window.showToast(`Active student set to ${selected === "ALL" ? "All Demo Students" : selected}.`, "info");
+    } catch (_err) {}
+  });
+
+  return switcherEl;
+};
+
 const updateProfileChip = (role) => {
   const chipName = document.getElementById("chip-name");
   const chipStatus = document.getElementById("chip-status");
@@ -224,6 +285,18 @@ const updateProfileChip = (role) => {
         chipStatus.textContent = "Not registered for any event";
       }
     }
+  }
+
+  // Inject the student switcher into #profile-chip (visible in Student Mode only).
+  const profileChip = document.getElementById("profile-chip");
+  if (profileChip && !profileChip.querySelector("#student-switcher")) {
+    const switcher = buildStudentSwitcher();
+    profileChip.appendChild(switcher);
+    switcher.hidden = role !== "student";
+  }
+  if (profileChip && role === "admin") {
+    const existing = profileChip.querySelector("#student-switcher");
+    if (existing) existing.hidden = true;
   }
 };
 
@@ -430,11 +503,19 @@ const bindDataButtons = () => {
   const clearData = document.getElementById("btn-clear-data");
   if (clearData) {
     clearData.addEventListener("click", () => {
-      StorageService.resetDatabase();
+      StorageService.clearAllData();
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      renderDashboardStats();
+      EventsModule?.render?.();
+      RegistrationModule?.renderPasses?.();
+      renderHistory();
+      AttendanceModule?.renderRoster?.();
+      FeedbackModule?.renderAdminDashboard?.();
+      ReportsModule?.renderCharts?.();
+      updateProfileChip(role);
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {
-        window.showToast("All data cleared and reseeded.", "success");
+        window.showToast("All data cleared.", "success");
       }
     });
   }
@@ -453,7 +534,12 @@ const renderHistory = () => {
   const empty = document.getElementById("history-empty");
   if (!list) return;
 
-  const regs = StorageService.getRegistrations();
+  const activeStudentId = StorageService.getActiveStudentId();
+  const allRegs = StorageService.getRegistrations();
+  const regs =
+    activeStudentId === "ALL"
+      ? allRegs
+      : allRegs.filter((r) => r.studentId === activeStudentId);
   const feedbacks = StorageService.getFeedback();
 
   const hasFeedback = (reg) =>
