@@ -9,6 +9,7 @@ const REGISTRATIONS_KEY = "academic_registrations_db";
 const FEEDBACK_KEY = "academic_feedback_db";
 const REMINDERS_KEY = "academic_reminders_db";
 const ROLE_KEY = "academic_active_role";
+const STUDENT_ID_KEY = "academic_active_student_id";
 
 const DEFAULT_ROLE = "student";
 
@@ -238,6 +239,24 @@ class StorageService {
    */
   static setActiveRole(role) {
     return this._write(ROLE_KEY, role);
+  }
+
+  /**
+   * Returns the active student ID used to scope student-owned views, or null
+   * when no student session is active.
+   * @returns {string|null}
+   */
+  static getActiveStudentId() {
+    return this._read(STUDENT_ID_KEY, null);
+  }
+
+  /**
+   * Persists the active student ID.
+   * @param {string} studentId
+   * @returns {boolean}
+   */
+  static setActiveStudentId(studentId) {
+    return this._write(STUDENT_ID_KEY, studentId);
   }
 
   // ------------------------------------------------------------------

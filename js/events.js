@@ -166,25 +166,41 @@ const renderDiscover = () => {
     (ev) => matchesSearch(ev, currentFilters.query) && matchesFilters(ev)
   );
 
+  // Empty-state toggle: hide list & banner when no events exist; show list otherwise.
+  const discoverEmpty = document.getElementById("discover-empty");
+  const discoverList = document.getElementById("discover-list");
+  const banner = document.getElementById("reminders-banner-discover");
+
+  if (events.length === 0) {
+    if (discoverEmpty) discoverEmpty.hidden = false;
+    if (discoverList) discoverList.hidden = true;
+    if (banner) banner.hidden = true;
+    discoverContainer.innerHTML = "";
+    return;
+  }
+  if (discoverEmpty) discoverEmpty.hidden = true;
+  if (discoverList) discoverList.hidden = false;
+  if (banner) banner.hidden = false;
+
   const reminders = StorageService.getReminders();
 
   // Render Upcoming Event Reminders banner at the top of Discover Events
   const parent = discoverContainer.parentElement;
-  let banner = document.getElementById("reminders-banner-discover");
-  if (!banner && parent) {
-    banner = document.createElement("div");
-    banner.id = "reminders-banner-discover";
-    banner.className = "reminders-banner";
-    banner.style.cssText =
+  let bannerEl = banner;
+  if (!bannerEl && parent) {
+    bannerEl = document.createElement("div");
+    bannerEl.id = "reminders-banner-discover";
+    bannerEl.className = "reminders-banner";
+    bannerEl.style.cssText =
       "margin-bottom: var(--space-lg); padding: var(--space-md); background: var(--color-surface-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md);";
-    parent.insertBefore(banner, discoverContainer);
+    parent.insertBefore(bannerEl, discoverContainer);
   }
 
   const upcomingReminders = reminders.filter(
     (rem) => new Date(rem.sentAt) <= new Date()
   );
 
-  if (banner) {
+  if (bannerEl) {
     let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
     if (upcomingReminders.length === 0) {
       bannerHtml += `<p style="margin:0; font-size: var(--font-sm); color: var(--color-text-muted);">No upcoming reminders.</p>`;
@@ -196,7 +212,7 @@ const renderDiscover = () => {
       });
       bannerHtml += `</ul>`;
     }
-    banner.innerHTML = bannerHtml;
+    bannerEl.innerHTML = bannerHtml;
   }
 
   discoverContainer.innerHTML = "";
@@ -223,49 +239,73 @@ const renderDiscover = () => {
     const isClosed = isFull || isPastDeadline;
     const badge = badgeFor(registeredCount, capacity);
 
+    // Check if the active student is already registered for this event.
+    const activeStudentId = StorageService.getActiveStudentId();
+    const alreadyRegistered =
+      activeStudentId &&
+      registrations.some((r) => r.studentId === activeStudentId);
+
     const card = document.createElement("div");
-    card.className = "event-card card mb-3";
+    card.className = "event-card";
     card.style.cssText =
       "border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;";
 
     card.innerHTML = `
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <h5 class="card-title mb-0" style="font-size: var(--font-lg);">${escapeHtml(
-            event.title
-          )}</h5>
-          <span class="badge ${badge.cls}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">${escapeHtml(
-      badge.label
-    )}</span>
+      <div class="event-card-department">${escapeHtml(event.department)}</div>
+      <div class="event-card-body">
+        <div class="event-card-meta">
+          <h3 class="event-card-title">${escapeHtml(event.title)}</h3>
+          <div class="meta-row">
+            <span class="meta-icon">📅</span>
+            <span><strong>Date/Time:</strong> ${new Date(event.date).toLocaleString()}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-icon">📍</span>
+            <span><strong>Venue:</strong> ${escapeHtml(event.venue)}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-icon">🎤</span>
+            <span><strong>Speaker:</strong> ${escapeHtml(event.speaker || "—")}</span>
+          </div>
         </div>
-        <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Department:</strong> ${escapeHtml(
-          event.department
-        )}</p>
-        <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Date/Time:</strong> ${new Date(
-          event.date
-        ).toLocaleString()}</p>
-        <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Venue:</strong> ${escapeHtml(
-          event.venue
-        )}</p>
-        <p class="card-text" style="margin: var(--space-xs) 0;"><strong>Speaker:</strong> ${escapeHtml(
-          event.speaker || "—"
-        )}</p>
-        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: var(--space-sm) 0;">
-          <div style="width: ${Math.min(fillPercent, 100)}%; height: 100%; background: ${isFull ? "#dc2626" : fillPercent >= 80 ? "#d97706" : "#059669"};"></div>
+        <div class="capacity-bar-wrap">
+          <div class="capacity-bar" style="width: ${Math.min(fillPercent, 100)}%; background: ${isFull ? "var(--status-housefull)" : fillPercent >= 80 ? "var(--status-pending)" : "var(--status-open)"};"></div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-sm);">
-          <small style="color: var(--color-text-muted);">${registeredCount}/${capacity} seats</small>
-          <button class="btn btn-primary btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""} style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">
-            ${isClosed ? (isPastDeadline ? "Deadline Passed" : "Full") : "Register Now"}
-          </button>
+        <div class="capacity-text">
+          <span>${registeredCount}/${capacity} seats</span>
+          <span>${escapeHtml(badge.label)}</span>
+        </div>
+        <div class="event-card-footer" style="display:flex; gap: var(--space-sm); flex-wrap: wrap;">
+          ${alreadyRegistered
+            ? `<span class="status-badge registered">Registered ✓</span>
+               <button class="btn btn-ghost btn-sm btn-view-my-pass" data-id="${event.id}" data-regid="${registrations.find((r) => r.studentId === activeStudentId)?.regId || ""}">View My Pass</button>`
+            : `<button class="btn btn-primary btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
+                ${isClosed ? (isPastDeadline ? "Deadline Passed" : "Full") : "Register Now"}
+              </button>`
+          }
         </div>
       </div>
     `;
 
-    const btn = card.querySelector(".btn-register");
-    if (btn && !isClosed) {
-      btn.addEventListener("click", () => {
+    const btnRegister = card.querySelector(".btn-register");
+    if (btnRegister && !isClosed && !alreadyRegistered) {
+      btnRegister.addEventListener("click", () => {
         openRegistrationModal(event.id);
+      });
+    }
+
+    const btnViewPass = card.querySelector(".btn-view-my-pass");
+    if (btnViewPass) {
+      btnViewPass.addEventListener("click", () => {
+        const regId = btnViewPass.dataset.regid;
+        if (regId && typeof window.RegistrationModule?.showPassQR === "function") {
+          window.RegistrationModule.showPassQR(regId);
+          if (typeof window.app?.showTab === "function") {
+            window.app.showTab("passes");
+          }
+        } else {
+          window.showToast("Pass not available.", "error");
+        }
       });
     }
 
@@ -410,7 +450,7 @@ const renderAdminTable = () => {
       if (typeof window.AttendanceModule?.filterRosterByEvent === "function") {
         window.AttendanceModule.filterRosterByEvent(eventId);
       } else {
-        showTab("roster");
+        window.app?.showTab?.("roster");
       }
     });
   });
@@ -446,6 +486,7 @@ const deleteEvent = (eventId) => {
   renderDiscover();
   renderAdminTable();
   populateFilters();
+  window.app?.renderDashboardStats?.();
   window.showToast(`Event ${eventId} deleted.`, "success");
 };
 
@@ -641,6 +682,7 @@ const initCreateEventModal = () => {
     renderDiscover();
     renderAdminTable();
     populateFilters();
+    window.app?.renderDashboardStats?.();
   });
 };
 
