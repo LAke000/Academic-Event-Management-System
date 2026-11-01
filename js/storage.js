@@ -9,8 +9,8 @@ const REGISTRATIONS_KEY = "academic_registrations_db";
 const FEEDBACK_KEY = "academic_feedback_db";
 const REMINDERS_KEY = "academic_reminders_db";
 const ROLE_KEY = "academic_active_role";
-const STUDENT_ID_KEY = "academic_active_student_id";
 const ACTIVE_STUDENT_KEY = "academic_active_student";
+const CLEARED_FLAG_KEY = "academic_db_cleared";
 
 const DEFAULT_ROLE = "student";
 const DEFAULT_ACTIVE_STUDENT_ID = "12601928";
@@ -249,7 +249,7 @@ class StorageService {
    * @returns {string}
    */
   static getActiveStudentId() {
-    return this._read(STUDENT_ID_KEY, DEFAULT_ACTIVE_STUDENT_ID) || DEFAULT_ACTIVE_STUDENT_ID;
+    return this._read(ACTIVE_STUDENT_KEY, DEFAULT_ACTIVE_STUDENT_ID) || DEFAULT_ACTIVE_STUDENT_ID;
   }
 
   /**
@@ -259,7 +259,7 @@ class StorageService {
    * @returns {boolean}
    */
   static setActiveStudentId(studentId) {
-    return this._write(STUDENT_ID_KEY, studentId);
+    return this._write(ACTIVE_STUDENT_KEY, studentId);
   }
 
   // ------------------------------------------------------------------
@@ -276,6 +276,10 @@ class StorageService {
     const regsOk = this._write(REGISTRATIONS_KEY, []);
     const feedbackOk = this._write(FEEDBACK_KEY, []);
     const remindersOk = this._write(REMINDERS_KEY, []);
+    try {
+      localStorage.setItem(CLEARED_FLAG_KEY, "true");
+    } catch (_err) {}
+    this.setActiveStudentId("ALL");
     return eventsOk && regsOk && feedbackOk && remindersOk;
   }
 
@@ -288,6 +292,10 @@ class StorageService {
     localStorage.removeItem(FEEDBACK_KEY);
     localStorage.removeItem(REMINDERS_KEY);
     localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(ACTIVE_STUDENT_KEY);
+    try {
+      localStorage.removeItem(CLEARED_FLAG_KEY);
+    } catch (_err) {}
     this.seedDemoData(true);
   }
 
@@ -301,8 +309,13 @@ class StorageService {
    * @param {boolean} [force=false]
    */
   static seedDemoData(force = false) {
+    if (localStorage.getItem(CLEARED_FLAG_KEY) === "true" && !force) return;
     const existing = this.getEvents();
     if (existing.length && !force) return; // already seeded; preserve data
+
+    try {
+      localStorage.removeItem(CLEARED_FLAG_KEY);
+    } catch (_err) {}
 
     // ── 4 realistic university events (zero field truncation) ──
     const events = [
@@ -452,8 +465,13 @@ class StorageService {
         email: "frank.zhao@example.edu",
         department: "ME",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Present",
         checkInTime: new Date().toISOString(),
+        attendance: {
+          status: "Present",
+          checkInTime: new Date().toISOString(),
+        },
       },
       {
         regId: "REG-8827",
@@ -463,8 +481,13 @@ class StorageService {
         email: "grace.oneil@example.edu",
         department: "Polytechnic",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Registered",
         checkInTime: null,
+        attendance: {
+          status: "Registered",
+          checkInTime: null,
+        },
       },
       {
         regId: "REG-8828",
@@ -474,8 +497,13 @@ class StorageService {
         email: "hiro.tanaka@example.edu",
         department: "Polytechnic",
         timestamp: new Date().toISOString(),
+        registeredAt: new Date().toISOString(),
         status: "Registered",
         checkInTime: null,
+        attendance: {
+          status: "Registered",
+          checkInTime: null,
+        },
       },
     ];
     this.saveRegistrations(registrations);
@@ -527,6 +555,21 @@ class StorageService {
       },
     ];
     this.saveReminders(reminders);
+
+    const seededStudentIds = [
+      "12601928",
+      "12601929",
+      "12601930",
+      "12601931",
+      "12601932",
+      "12601933",
+      "12601934",
+      "12601935",
+    ];
+    const currentActive = this.getActiveStudentId();
+    if (currentActive !== "ALL" && !seededStudentIds.includes(currentActive)) {
+      this.setActiveStudentId("12601928");
+    }
   }
 }
 

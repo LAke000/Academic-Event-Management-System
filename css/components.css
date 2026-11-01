@@ -139,33 +139,45 @@
 }
 
 .status-badge.open,
-.badge--success {
+.status-badge--open,
+.badge--success,
+.badge.bg-success,
+.badge.bg-primary {
   background-color: var(--status-open-bg);
   color: var(--status-open);
 }
 
-.status-badge.housefull {
+.status-badge.housefull,
+.status-badge--housefull,
+.badge.bg-danger {
   background-color: var(--status-housefull-bg);
   color: var(--status-housefull);
 }
 
 .status-badge.registered,
+.status-badge--registered,
 .badge--pending {
   background-color: var(--status-registered-bg);
   color: var(--status-registered);
 }
 
-.status-badge.present {
+.status-badge.present,
+.status-badge--present,
+.badge--present {
   background-color: var(--status-present-bg);
   color: var(--status-present);
 }
 
-.status-badge.absent {
+.status-badge.absent,
+.status-badge--absent,
+.badge--absent {
   background-color: var(--status-absent-bg);
   color: var(--status-absent);
 }
 
-.status-badge.pending {
+.status-badge.pending,
+.status-badge--pending,
+.badge.bg-warning {
   background-color: var(--status-pending-bg);
   color: var(--status-pending);
 }
@@ -1074,4 +1086,142 @@ input[type="radio"] {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* ============================================================
+   9. Feedback Admin Dashboard & Star Widget
+   Supports js/feedback.js: event selector, summary scorecards,
+   rating distribution bars, and review cards.
+   ============================================================ */
+
+/* Star widget (interactive rating input) — the :checked sibling rules
+   above handle CSS-only highlighting; .star-active is applied by
+   feedback.js mouse/keyboard handlers, so it shares the same palette. */
+.star-label.star-active {
+  color: #fbbf24;
+}
+
+/* Event selector dropdown */
+.feedback-selector-wrap {
+  max-width: 420px;
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* Summary: scorecards + rating breakdown side by side */
+.feedback-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  align-items: start;
+}
+
+/* Rating distribution panel */
+.rating-distribution {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.rating-distribution h3 {
+  font-size: var(--font-base);
+  margin-bottom: var(--space-md);
+}
+
+.distribution-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.distribution-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
+}
+
+.distribution-label {
+  width: 36px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.distribution-bar-track {
+  flex: 1;
+  height: 10px;
+  background-color: var(--color-surface-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.distribution-bar-fill {
+  height: 100%;
+  background-color: #f59e0b;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+.distribution-count {
+  width: 28px;
+  text-align: right;
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+}
+
+/* Reviews list */
+.feedback-reviews-heading {
+  margin-bottom: var(--space-md);
+}
+
+.feedback-no-reviews {
+  margin: 0;
+  padding: var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+}
+
+.review-card {
+  margin-bottom: var(--space-md);
+}
+
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.review-student {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.review-stars .star-filled {
+  color: #f59e0b;
+}
+
+.review-stars .star-empty {
+  color: var(--color-border);
+}
+
+.review-date {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.review-comment {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.review-comment.review-comment--empty {
+  font-style: italic;
+  color: var(--color-text-muted);
 }

@@ -501,8 +501,12 @@ input, select, textarea {
   overflow-y: auto;
 }
 
-/* Strict role access scoping — Student Mode hides all admin-only UI. */
+/* Strict role access scoping — Student Mode hides all admin-only UI, Admin Mode hides all student-only UI. */
 body.role-student .admin-only {
+  display: none !important;
+}
+
+body.role-admin .student-only {
   display: none !important;
 }
 

@@ -334,9 +334,12 @@ const renderPasses = () => {
     bannerWrap.insertBefore(banner, passesList);
   }
 
-  const upcomingReminders = reminders.filter(
-    (rem) => new Date(rem.sentAt) <= new Date()
-  );
+  const upcomingReminders = reminders.filter((rem) => {
+    if (new Date(rem.sentAt) > new Date()) return false;
+    if (activeStudentId === "ALL") return true;
+    // Student-scoped: only show reminders for events this student registered for.
+    return regs.some((r) => r.eventId === rem.eventId);
+  });
   const registeredUpcoming = regs.filter(
     (r) => r.status === "Registered"
   );

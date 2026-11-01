@@ -43,16 +43,16 @@
   <div class="app-layout">
     <aside class="sidebar" id="sidebar">
       <nav class="sidebar-nav" id="sidebar-nav">
-        <h3 class="nav-section">Student Portal</h3>
-        <a href="#discover" class="nav-link active" data-tab="discover" aria-controls="discover" aria-current="page">
+        <h3 class="nav-section student-only">Student Portal</h3>
+        <a href="#discover" class="nav-link student-only active" data-tab="discover" aria-controls="discover" aria-current="page">
           <span class="nav-icon">&#128209;</span>
           <span class="nav-text">Discover Events</span>
         </a>
-        <a href="#passes" class="nav-link" data-tab="passes" aria-controls="passes">
+        <a href="#passes" class="nav-link student-only" data-tab="passes" aria-controls="passes">
           <span class="nav-icon">&#128274;</span>
           <span class="nav-text">My Passes</span>
         </a>
-        <a href="#history" class="nav-link" data-tab="history" aria-controls="history">
+        <a href="#history" class="nav-link student-only" data-tab="history" aria-controls="history">
           <span class="nav-icon">&#128197;</span>
           <span class="nav-text">History & Certificates</span>
         </a>
@@ -97,9 +97,9 @@
         <div id="discover-empty" class="empty-state" hidden>
           <div class="empty-icon">&#128197;</div>
           <h2>No Events Created Yet</h2>
-          <p>There are no events to display. Ask an organizer to create one, or seed demo academic data to explore the portal.</p>
+          <p>There are no upcoming events published at the moment. Please check back later.</p>
           <div class="empty-actions">
-            <button class="btn btn-primary" onclick="app.seedDemoData()">Load Demo Academic Data</button>
+            <button class="btn btn-primary admin-only" onclick="app.seedDemoData()">Load Demo Academic Data</button>
             <button class="btn btn-ghost admin-only" onclick="app.showTab('dashboard')">View Admin Dashboard</button>
           </div>
         </div>

@@ -300,9 +300,6 @@ const renderDiscover = () => {
         const regId = btnViewPass.dataset.regid;
         if (regId && typeof window.RegistrationModule?.showPassQR === "function") {
           window.RegistrationModule.showPassQR(regId);
-          if (typeof window.app?.showTab === "function") {
-            window.app.showTab("passes");
-          }
         } else {
           window.showToast("Pass not available.", "error");
         }
@@ -483,10 +480,21 @@ const deleteEvent = (eventId) => {
   );
   StorageService.saveFeedback(remainingFeedback);
 
+  // Cascade-remove reminders for this event (zero orphaned records)
+  const remainingReminders = StorageService.getReminders().filter(
+    (rem) => rem.eventId !== eventId
+  );
+  StorageService.saveReminders(remainingReminders);
+
   renderDiscover();
   renderAdminTable();
   populateFilters();
   window.app?.renderDashboardStats?.();
+  try { window.RegistrationModule?.renderPasses?.(); } catch (_err) {}
+  try { window.app?.renderHistory?.(); } catch (_err) {}
+  try { window.AttendanceModule?.renderRoster?.(); } catch (_err) {}
+  try { window.FeedbackModule?.renderAdminDashboard?.(); } catch (_err) {}
+  try { window.ReportsModule?.renderCharts?.(); } catch (_err) {}
   window.showToast(`Event ${eventId} deleted.`, "success");
 };
 
@@ -626,10 +634,29 @@ const initCreateEventModal = () => {
 
     const deadline = formFields.deadline ? formFields.deadline.value : "";
 
+    // Validation: registration deadline must not be after the event start time.
+    if (deadline && new Date(deadline) > new Date(dateTime)) {
+      window.showToast(
+        "Registration deadline must be before the event start date and time.",
+        "error"
+      );
+      return;
+    }
+
     // Compute the actual registration count so status reflects reality
     const currentRegCount = editingEventId
       ? StorageService.getRegistrationsByEvent(editingEventId).length
       : 0;
+
+    // Validation: when editing, capacity cannot drop below current registrations.
+    if (editingEventId && capacity < currentRegCount) {
+      window.showToast(
+        "Capacity cannot be less than current registrations (" + currentRegCount + ").",
+        "error"
+      );
+      return;
+    }
+
     const isFull = currentRegCount >= capacity;
 
     // Build the updated event payload (zero-truncation: preserve all fields)
@@ -707,14 +734,13 @@ const openEditEventDialog = (eventId) => {
   if (formFields.department) formFields.department.value = event.department;
   if (formFields.venue) formFields.venue.value = event.venue;
   if (formFields.dateTime) {
-    // datetime-local expects "YYYY-MM-DDTHH:MM" (no seconds)
-    const d = new Date(event.date);
-    formFields.dateTime.value = d.toISOString().slice(0, 16);
+    // datetime-local expects "YYYY-MM-DDTHH:MM" (no seconds), in local time.
+    formFields.dateTime.value = toLocalDatetimeInput(event.date);
   }
   if (formFields.capacity) formFields.capacity.value = event.capacity;
   if (formFields.speaker) formFields.speaker.value = event.speaker;
   if (formFields.deadline) {
-    formFields.deadline.value = event.deadline ? new Date(event.deadline).toISOString().slice(0, 16) : "";
+    formFields.deadline.value = toLocalDatetimeInput(event.deadline);
   }
 
   // Update dialog title and submit button text

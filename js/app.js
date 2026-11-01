@@ -15,6 +15,9 @@ const DEFAULT_VIEW_STUDENT = "discover";
 const DEFAULT_VIEW_ADMIN = "dashboard";
 const TOAST_DISMISS_MS = 3200;
 
+// Tabs that live in the "Student Portal" sidebar section.
+const STUDENT_TABS = ["discover", "passes", "history"];
+
 // Tabs that live in the "Admin / Organizer" sidebar section.
 const ADMIN_TABS = [
   "dashboard",
@@ -176,14 +179,25 @@ const setBodyRole = (role) => {
   document.body.classList.add(isAdmin ? "role-admin" : "role-student");
 };
 
-const toggleAdminTabs = (show) => {
+const toggleAdminTabs = (isAdmin) => {
+  // Toggle all sidebar navigation links according to role
   document
     .querySelectorAll("#sidebar-nav .nav-link[data-tab]")
     .forEach((link) => {
-      if (ADMIN_TABS.includes(link.dataset.tab)) {
-        link.hidden = !show;
-        link.style.display = show ? "" : "none";
-        if (!show) {
+      const tab = link.dataset.tab;
+      if (ADMIN_TABS.includes(tab)) {
+        link.hidden = !isAdmin;
+        link.style.display = isAdmin ? "" : "none";
+        if (!isAdmin) {
+          link.setAttribute("aria-hidden", "true");
+          link.removeAttribute("aria-current");
+        } else {
+          link.removeAttribute("aria-hidden");
+        }
+      } else if (STUDENT_TABS.includes(tab)) {
+        link.hidden = isAdmin;
+        link.style.display = isAdmin ? "none" : "";
+        if (isAdmin) {
           link.setAttribute("aria-hidden", "true");
           link.removeAttribute("aria-current");
         } else {
@@ -192,29 +206,77 @@ const toggleAdminTabs = (show) => {
       }
     });
 
+  // Toggle sidebar section headers
   const adminSection = Array.from(
     document.querySelectorAll("#sidebar-nav .nav-section")
   ).find((el) => /Admin/i.test(el.textContent || ""));
   if (adminSection) {
-    adminSection.hidden = !show;
+    adminSection.hidden = !isAdmin;
+    adminSection.style.display = isAdmin ? "" : "none";
+  }
+
+  const studentSection = Array.from(
+    document.querySelectorAll("#sidebar-nav .nav-section")
+  ).find((el) => /Student/i.test(el.textContent || ""));
+  if (studentSection) {
+    studentSection.hidden = isAdmin;
+    studentSection.style.display = isAdmin ? "none" : "";
   }
 };
 
 const buildStudentSwitcher = () => {
-  const switcher = document.getElementById("student-switcher");
-  if (switcher) return switcher;
+  let switcherEl = document.getElementById("student-switcher");
+  if (switcherEl) return switcherEl;
 
-  const switcherEl = document.createElement("select");
+  switcherEl = document.createElement("select");
   switcherEl.id = "student-switcher";
   switcherEl.setAttribute("aria-label", "Switch active student profile");
   switcherEl.style.cssText =
     "margin-left: var(--space-sm); padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-xs); background: var(--color-surface); color: var(--color-text-primary);";
 
-  const allOpt = document.createElement("option");
-  allOpt.value = "ALL";
-  allOpt.textContent = "All Demo Students";
-  switcherEl.appendChild(allOpt);
+  switcherEl.addEventListener("change", (e) => {
+    const selected = e.target.value;
+    try {
+      StorageService.setActiveStudentId(selected);
+    } catch (_err) {}
+    try {
+      updateProfileChip(StorageService.getActiveRole() || DEFAULT_ROLE);
+    } catch (_err) {}
+    try {
+      window.EventsModule?.render?.();
+    } catch (_err) {}
+    try {
+      window.RegistrationModule?.renderPasses?.();
+    } catch (_err) {}
+    try {
+      renderHistory();
+    } catch (_err) {}
+    try {
+      window.showToast(
+        `Active student set to ${selected === "ALL" ? "All Demo Students" : selected}.`,
+        "info"
+      );
+    } catch (_err) {}
+  });
 
+  return switcherEl;
+};
+
+const refreshStudentSwitcher = (role) => {
+  let switcher = document.getElementById("student-switcher");
+  const profileChip = document.getElementById("profile-chip");
+  if (!switcher && profileChip) {
+    switcher = buildStudentSwitcher();
+    profileChip.appendChild(switcher);
+  }
+  if (!switcher) return;
+
+  const isStudent = role === "student";
+  switcher.hidden = !isStudent;
+  switcher.style.display = isStudent ? "" : "none";
+
+  const currentVal = StorageService.getActiveStudentId() || "ALL";
+  switcher.innerHTML = '<option value="ALL">All Demo Students</option>';
   try {
     const regs = StorageService.getRegistrations();
     const seen = new Set();
@@ -224,80 +286,75 @@ const buildStudentSwitcher = () => {
         const opt = document.createElement("option");
         opt.value = r.studentId;
         opt.textContent = `${r.name || "Unknown"} (${r.studentId})`;
-        switcherEl.appendChild(opt);
+        switcher.appendChild(opt);
       }
     });
-  } catch (_err) {
-    // non-fatal: student list is cosmetic
-  }
-
-  const activeId = StorageService.getActiveStudentId();
-  switcherEl.value = activeId || "ALL";
-
-  switcherEl.addEventListener("change", (e) => {
-    const selected = e.target.value;
-    try {
-      StorageService.setActiveStudentId(selected);
-    } catch (_err) {
-      // non-fatal
-    }
-    try {
-      updateProfileChip(StorageService.getActiveRole() || "student");
-    } catch (_err) {}
-    try {
-      EventsModule?.render?.();
-    } catch (_err) {}
-    try {
-      RegistrationModule?.renderPasses?.();
-    } catch (_err) {}
-    try {
-      renderHistory();
-    } catch (_err) {}
-    try {
-      window.showToast(`Active student set to ${selected === "ALL" ? "All Demo Students" : selected}.`, "info");
-    } catch (_err) {}
-  });
-
-  return switcherEl;
+  } catch (_err) {}
+  switcher.value = currentVal;
 };
 
 const updateProfileChip = (role) => {
+  refreshStudentSwitcher(role);
+
   const chipName = document.getElementById("chip-name");
   const chipStatus = document.getElementById("chip-status");
   const chipAvatar = document.getElementById("chip-avatar");
-  if (chipName) {
-    chipName.textContent = role === "admin" ? "Admin Mode" : "Student Mode";
-  }
-  if (chipAvatar) {
-    chipAvatar.textContent = role === "admin" ? "A" : "S";
-  }
-  if (chipStatus) {
-    if (role === "admin") {
-      chipStatus.textContent = "Organizer access enabled";
+
+  if (role === "admin") {
+    if (chipName) chipName.textContent = "Admin Mode";
+    if (chipAvatar) chipAvatar.textContent = "A";
+    if (chipStatus) chipStatus.textContent = "Organizer access enabled";
+  } else {
+    const activeId = StorageService.getActiveStudentId() || "ALL";
+    const regs = StorageService.getRegistrations();
+    let studentName = "";
+    let count = 0;
+
+    if (activeId === "ALL") {
+      studentName = "All Students View";
+      count = regs.length;
     } else {
-      try {
-        const regs = StorageService.getRegistrations();
-        const count = regs.length;
-        chipStatus.textContent = count > 0
-          ? `Registered for ${count} event(s)`
-          : "Not registered for any event";
-      } catch (err) {
-        chipStatus.textContent = "Not registered for any event";
+      const studentRegs = regs.filter((r) => r.studentId === activeId);
+      count = studentRegs.length;
+      const firstReg = studentRegs[0] || regs.find((r) => r.studentId === activeId);
+      if (firstReg && firstReg.name) {
+        studentName = `${firstReg.name} (${activeId})`;
+      } else {
+        studentName = `Student (${activeId})`;
       }
     }
-  }
 
-  // Inject the student switcher into #profile-chip (visible in Student Mode only).
-  const profileChip = document.getElementById("profile-chip");
-  if (profileChip && !profileChip.querySelector("#student-switcher")) {
-    const switcher = buildStudentSwitcher();
-    profileChip.appendChild(switcher);
-    switcher.hidden = role !== "student";
+    if (chipName) chipName.textContent = studentName;
+    if (chipAvatar) {
+      chipAvatar.textContent =
+        activeId === "ALL"
+          ? "S"
+          : (studentName ? studentName.charAt(0).toUpperCase() : "S");
+    }
+    if (chipStatus) {
+      chipStatus.textContent =
+        count > 0
+          ? "Registered for " + count + " event(s)"
+          : "Not registered for any event";
+    }
   }
-  if (profileChip && role === "admin") {
-    const existing = profileChip.querySelector("#student-switcher");
-    if (existing) existing.hidden = true;
-  }
+};
+
+/**
+ * Refresh every module after data changes (seed / clear / delete), so the
+ * student switcher, profile chip, dashboard, catalog, roster, passes,
+ * attendance, feedback, and reports all stay in sync with storage.
+ * @param {string} role
+ */
+const refreshAllModules = (role) => {
+  renderDashboardStats();
+  try { EventsModule?.render?.(); } catch (_err) {}
+  try { window.RegistrationModule?.renderPasses?.(); } catch (_err) {}
+  try { renderHistory(); } catch (_err) {}
+  try { window.AttendanceModule?.renderRoster?.(); } catch (_err) {}
+  try { window.FeedbackModule?.renderAdminDashboard?.(); } catch (_err) {}
+  try { window.ReportsModule?.renderCharts?.(); } catch (_err) {}
+  updateProfileChip(role);
 };
 
 const applyRole = (role) => {
@@ -447,6 +504,7 @@ const bindDataButtons = () => {
     seedTop.addEventListener("click", () => {
       StorageService.seedDemoData(true);
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      refreshAllModules(role);
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
@@ -458,7 +516,8 @@ const bindDataButtons = () => {
   if (loadDemo) {
     loadDemo.addEventListener("click", () => {
       StorageService.seedDemoData(true);
-      renderDashboardStats();
+      const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      refreshAllModules(role);
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
       }
@@ -469,7 +528,8 @@ const bindDataButtons = () => {
   if (loadDemoDash) {
     loadDemoDash.addEventListener("click", () => {
       StorageService.seedDemoData(true);
-      renderDashboardStats();
+      const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      refreshAllModules(role);
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
       }
@@ -487,13 +547,8 @@ const bindDataButtons = () => {
   if (loadDemoReports) {
     loadDemoReports.addEventListener("click", () => {
       StorageService.seedDemoData(true);
-      renderDashboardStats();
-      updateProfileChip(StorageService.getActiveRole() || DEFAULT_ROLE);
-      try {
-        window.ReportsModule?.renderCharts?.();
-      } catch (_err) {
-        // charts render on tab switch as fallback
-      }
+      const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      refreshAllModules(role);
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
       }
@@ -505,14 +560,7 @@ const bindDataButtons = () => {
     clearData.addEventListener("click", () => {
       StorageService.clearAllData();
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
-      renderDashboardStats();
-      EventsModule?.render?.();
-      RegistrationModule?.renderPasses?.();
-      renderHistory();
-      AttendanceModule?.renderRoster?.();
-      FeedbackModule?.renderAdminDashboard?.();
-      ReportsModule?.renderCharts?.();
-      updateProfileChip(role);
+      refreshAllModules(role);
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {
         window.showToast("All data cleared.", "success");

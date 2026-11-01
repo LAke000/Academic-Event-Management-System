@@ -564,22 +564,21 @@ const applyRosterFilters = (regs) => {
  */
 const populateEventFilter = () => {
   if (!rosterEventFilter) return;
-  const currentValue = rosterEventFilter.value;
+  const desiredValue = rosterFilterState.eventId || rosterEventFilter.value || "";
   const events = StorageService.getEvents();
-  // Keep existing "All Events" option; append any missing events.
-  const existing = [...rosterEventFilter.options].map((o) => o.value);
+  rosterEventFilter.innerHTML = '<option value="">All Events</option>';
   events.forEach((ev) => {
-    if (!existing.includes(ev.id)) {
-      const opt = document.createElement("option");
-      opt.value = ev.id;
-      opt.textContent = `${ev.title} (${ev.id})`;
-      rosterEventFilter.appendChild(opt);
-    }
+    const opt = document.createElement("option");
+    opt.value = ev.id;
+    opt.textContent = `${ev.title} (${ev.id})`;
+    rosterEventFilter.appendChild(opt);
   });
-  rosterEventFilter.value = existing.includes(currentValue) ? currentValue : "";
-  // Preserve any externally-set filter (e.g. from filterRosterByEvent) after populating options.
-  if (rosterFilterState.eventId && existing.includes(rosterFilterState.eventId)) {
-    rosterEventFilter.value = rosterFilterState.eventId;
+  const validIds = events.map((ev) => ev.id);
+  if (desiredValue && validIds.includes(desiredValue)) {
+    rosterEventFilter.value = desiredValue;
+  } else {
+    rosterFilterState.eventId = "";
+    rosterEventFilter.value = "";
   }
 };
 

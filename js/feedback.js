@@ -285,15 +285,19 @@ const FeedbackModule = (() => {
     }
     if (feedbackEmpty) feedbackEmpty.hidden = true;
 
-    // Collect events that have feedback
-    const eventIdsWithFeedback = [...new Set(allFeedback.map((f) => f.eventId))];
+    // Compute review count per event (for option labels)
+    const reviewCountByEvent = {};
+    allFeedback.forEach((f) => {
+      reviewCountByEvent[f.eventId] = (reviewCountByEvent[f.eventId] || 0) + 1;
+    });
 
     // Determine which event is currently selected (persist across re‑renders)
     const existingSelector = feedbackListContainer.querySelector("#feedback-event-selector");
     let selectedEventId = existingSelector ? existingSelector.value : "";
-    // Default to first event if nothing selected or selection no longer valid
-    if (!selectedEventId || !eventIdsWithFeedback.includes(selectedEventId)) {
-      selectedEventId = eventIdsWithFeedback[0] || "";
+    const allEventIds = allEvents.map((ev) => ev.id);
+    // Validate selection; default to "ALL" if nothing valid
+    if (!selectedEventId || (selectedEventId !== "ALL" && !allEventIds.includes(selectedEventId))) {
+      selectedEventId = "ALL";
     }
 
     // Build container HTML
@@ -313,12 +317,20 @@ const FeedbackModule = (() => {
     selector.className = "form-select";
     selector.setAttribute("aria-label", "Filter feedback by event");
 
-    eventIdsWithFeedback.forEach((eid) => {
-      const event = allEvents.find((ev) => ev.id === eid);
+    // "All Events (Overall Summary)" option
+    const allOpt = document.createElement("option");
+    allOpt.value = "ALL";
+    allOpt.textContent = "All Events (Overall Summary)";
+    if (selectedEventId === "ALL") allOpt.selected = true;
+    selector.appendChild(allOpt);
+
+    // All events with their review counts
+    allEvents.forEach((ev) => {
+      const count = reviewCountByEvent[ev.id] || 0;
       const opt = document.createElement("option");
-      opt.value = eid;
-      opt.textContent = event ? `${event.title} (${eid})` : eid;
-      if (eid === selectedEventId) opt.selected = true;
+      opt.value = ev.id;
+      opt.textContent = `${ev.title} (${count} review${count === 1 ? "" : "s"})`;
+      if (ev.id === selectedEventId) opt.selected = true;
       selector.appendChild(opt);
     });
 
@@ -330,7 +342,10 @@ const FeedbackModule = (() => {
     selector.addEventListener("change", () => renderAdminDashboard());
 
     // ── Compute stats for selected event ──
-    const eventFeedback = allFeedback.filter((f) => f.eventId === selectedEventId);
+    const eventFeedback =
+      selectedEventId === "ALL"
+        ? allFeedback
+        : allFeedback.filter((f) => f.eventId === selectedEventId);
     const totalReviews = eventFeedback.length;
     const avgRating =
       totalReviews > 0

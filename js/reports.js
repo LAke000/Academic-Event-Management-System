@@ -12,6 +12,8 @@ const DEPT_CHART_ID = "deptChart";
 const BTN_EXPORT_REGISTRATIONS_ID = "btn-export-registrations";
 const BTN_EXPORT_ATTENDANCE_ID = "btn-export-attendance";
 const BTN_EXPORT_FEEDBACK_ID = "btn-export-feedback";
+const REPORTS_EMPTY_ID = "reports-empty";
+const CHART_CARD_SELECTOR = ".chart-card";
 
 // ─── Chart instance management (destroy before re-render) ─────────────────
 let turnoutChart = null; // bar chart: registered vs present per event
@@ -101,6 +103,7 @@ const ensureDeptChartCanvas = () => {
  * @param {string} chartId
  */
 const destroyChartInstance = (chartId) => {
+  if (typeof Chart === "undefined") return; // library not loaded; nothing to destroy
   const canvas = document.getElementById(chartId);
   if (!canvas) return;
   const existing = Chart.getChart(canvas);
@@ -119,14 +122,38 @@ const renderAnalytics = () => {
   const events = StorageService.getEvents();
   const registrations = StorageService.getRegistrations();
 
+  // ── Empty-state toggle: charts only make sense once events exist ──
+  const hasEvents = events.length > 0;
+  const reportsEmpty = document.getElementById(REPORTS_EMPTY_ID);
+  if (reportsEmpty) reportsEmpty.hidden = hasEvents;
+  document.querySelectorAll(CHART_CARD_SELECTOR).forEach((card) => {
+    card.hidden = !hasEvents;
+  });
+
+  // No events: destroy any stale chart instances and bail out so empty
+  // canvases are never left mounted behind the empty-state message.
+  if (!hasEvents) {
+    destroyChartInstance(ATTENDANCE_CHART_ID);
+    destroyChartInstance(DEPT_CHART_ID);
+    return;
+  }
+
   // ── Bar chart data: Total Registered vs Marked Present per event ──
-  const eventLabels = events.map((ev) => escapeHtml(ev.title || ev.id));
-  const registeredData = events.map((ev) => ev.registered || 0);
-  const presentData = events.map((ev) =>
+  // Both series are derived from live registration records rather than the
+  // stored `ev.registered` counter, so the chart always reflects the current
+  // registration and check-in state (ECC zero-truncation / data integrity).
+  const registeredForEvent = (ev) =>
+    registrations.filter((r) => r.eventId === ev.id).length;
+  const presentForEvent = (ev) =>
     registrations.filter(
-      (r) => r.eventId === ev.id && r.status === "Present"
-    ).length
-  );
+      (r) =>
+        r.eventId === ev.id &&
+        (r.status === "Present" || r.attendance?.status === "Present")
+    ).length;
+
+  const eventLabels = events.map((ev) => escapeHtml(ev.title || ev.id));
+  const registeredData = events.map(registeredForEvent);
+  const presentData = events.map(presentForEvent);
 
   // ── Doughnut chart data: registrations grouped by department ──
   const deptCounts = {};
