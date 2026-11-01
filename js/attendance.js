@@ -391,6 +391,11 @@ const onScanSuccess = (decodedText, _decodedResult) => {
     playChime();
     renderLiveCheckinFeed();
     renderRoster();
+    // Synchronize Student ⇄ Admin state mutations across all views.
+    window.app?.renderDashboardStats?.();
+    window.app?.renderHistory?.();
+    window.RegistrationModule?.renderPasses?.();
+    window.EventsModule?.render?.();
   }
 };
 
@@ -572,6 +577,10 @@ const populateEventFilter = () => {
     }
   });
   rosterEventFilter.value = existing.includes(currentValue) ? currentValue : "";
+  // Preserve any externally-set filter (e.g. from filterRosterByEvent) after populating options.
+  if (rosterFilterState.eventId && existing.includes(rosterFilterState.eventId)) {
+    rosterEventFilter.value = rosterFilterState.eventId;
+  }
 };
 
 /**
@@ -632,6 +641,11 @@ const renderRoster = () => {
         playChime();
         renderRoster();
         renderLiveCheckinFeed();
+        // Synchronize Student ⇄ Admin state mutations across all views.
+        window.app?.renderDashboardStats?.();
+        window.app?.renderHistory?.();
+        window.RegistrationModule?.renderPasses?.();
+        window.EventsModule?.render?.();
       }
     });
   });
@@ -642,14 +656,20 @@ const renderRoster = () => {
  * from the Manage Events admin table so the roster opens scoped to that event.
  * @param {string} eventId
  */
-AttendanceModule.filterRosterByEvent = (eventId) => {
+const filterRosterByEvent = (eventId) => {
   if (!eventId) return;
   rosterFilterState.eventId = eventId;
   rosterFilterState.query = "";
   rosterFilterState.status = "";
+  ensureFilterToolbar();
+  populateEventFilter();
   if (rosterSearchInput) rosterSearchInput.value = "";
   if (rosterStatusFilter) rosterStatusFilter.value = "";
-  showTab("roster");
+  if (rosterEventFilter) rosterEventFilter.value = eventId;
+  if (typeof window.app?.showTab === "function") {
+    window.app.showTab("roster");
+  }
+  renderRoster();
 };
 
 // ─── Utility: HTML escaping ───────────────────────────────────────────────
@@ -710,6 +730,11 @@ const bindEvents = () => {
         if (manualSearchInput) manualSearchInput.value = "";
         renderLiveCheckinFeed();
         renderRoster();
+        // Synchronize Student ⇄ Admin state mutations across all views.
+        window.app?.renderDashboardStats?.();
+        window.app?.renderHistory?.();
+        window.RegistrationModule?.renderPasses?.();
+        window.EventsModule?.render?.();
       }
     });
   }

@@ -351,6 +351,17 @@ const renderAdminTable = () => {
   const events = StorageService.getEvents();
   adminTableBody.innerHTML = "";
 
+  // Toggle empty-state vs. list visibility
+  const eventsEmpty = document.getElementById("events-empty");
+  const eventsList = document.getElementById("events-list");
+  if (events.length === 0) {
+    if (eventsEmpty) eventsEmpty.hidden = false;
+    if (eventsList) eventsList.hidden = true;
+    return;
+  }
+  if (eventsEmpty) eventsEmpty.hidden = true;
+  if (eventsList) eventsList.hidden = false;
+
   events.forEach((ev) => {
     const registrations = StorageService.getRegistrationsByEvent(ev.id);
     const registeredCount = registrations.length;
@@ -574,6 +585,12 @@ const initCreateEventModal = () => {
 
     const deadline = formFields.deadline ? formFields.deadline.value : "";
 
+    // Compute the actual registration count so status reflects reality
+    const currentRegCount = editingEventId
+      ? StorageService.getRegistrationsByEvent(editingEventId).length
+      : 0;
+    const isFull = currentRegCount >= capacity;
+
     // Build the updated event payload (zero-truncation: preserve all fields)
     const updatedEvent = {
       id: editingEventId || eventId,
@@ -584,11 +601,8 @@ const initCreateEventModal = () => {
       date: new Date(dateTime).toISOString(),
       deadline: deadline ? new Date(deadline).toISOString() : "",
       capacity,
-      // Preserve existing registered count when editing; 0 when creating new
-      registered: editingEventId
-        ? (events.find((ev) => ev.id === editingEventId)?.registered || 0)
-        : 0,
-      status: "Open",
+      registered: currentRegCount,
+      status: isFull ? "Housefull" : "Open",
       speaker,
     };
 
@@ -615,12 +629,13 @@ const initCreateEventModal = () => {
       return;
     }
 
+    const wasEditing = Boolean(editingEventId);
     createForm.reset();
     resetCreateDialog();
     if (typeof createDialog.close === "function") createDialog.close();
 
     window.showToast(
-      editingEventId ? "Event updated successfully" : "Event created successfully",
+      wasEditing ? "Event updated successfully." : "Event created successfully.",
       "success"
     );
     renderDiscover();

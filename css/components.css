@@ -170,6 +170,17 @@
   color: var(--status-pending);
 }
 
+/* Badge fill variants (admin table status chips) */
+.badge.bg-danger {
+  background-color: var(--status-housefull-bg);
+  color: var(--status-housefull);
+}
+
+.badge.bg-success {
+  background-color: var(--status-open-bg);
+  color: var(--status-open);
+}
+
 /* Passes grid */
 .passes-grid {
   display: grid;
