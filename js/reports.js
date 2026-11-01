@@ -130,6 +130,29 @@ const renderAnalytics = () => {
     card.hidden = !hasEvents;
   });
 
+  // ── Inject / refresh event filter dropdown for CSV exports ──
+  // Placed at the start of .report-actions so the admin can scope exports
+  // to a single event or leave it on "All Events" for a full dump.
+  const reportActions = document.querySelector(".report-actions");
+  let reportEventFilter = document.getElementById("reports-event-filter");
+  if (reportActions && !reportEventFilter) {
+    reportEventFilter = document.createElement("select");
+    reportEventFilter.id = "reports-event-filter";
+    reportEventFilter.className = "filter-select";
+    reportEventFilter.style.cssText =
+      "padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); margin-left: var(--space-md); min-width: 200px;";
+    reportActions.insertBefore(reportEventFilter, reportActions.firstChild);
+  }
+  if (reportEventFilter) {
+    reportEventFilter.innerHTML = '<option value="">All Events</option>';
+    events.forEach((ev) => {
+      const opt = document.createElement("option");
+      opt.value = ev.id;
+      opt.textContent = ev.title || ev.id;
+      reportEventFilter.appendChild(opt);
+    });
+  }
+
   // No events: destroy any stale chart instances and bail out so empty
   // canvases are never left mounted behind the empty-state message.
   if (!hasEvents) {
@@ -373,16 +396,27 @@ const exportFeedbackCSV = (eventId) => {
 let initialized = false;
 
 const bindEvents = () => {
+  const getSelectedEventId = () => {
+    const el = document.getElementById("reports-event-filter");
+    return el?.value || undefined;
+  };
+
   if (btnExportRegistrations) {
     btnExportRegistrations.addEventListener("click", () =>
-      exportRegistrationsCSV()
+      exportRegistrationsCSV(getSelectedEventId())
     );
   }
   if (btnExportAttendance) {
-    btnExportAttendance.addEventListener("click", () => exportAttendanceCSV());
+    btnExportAttendance.addEventListener(
+      "click",
+      () => exportAttendanceCSV(getSelectedEventId())
+    );
   }
   if (btnExportFeedback) {
-    btnExportFeedback.addEventListener("click", () => exportFeedbackCSV());
+    btnExportFeedback.addEventListener(
+      "click",
+      () => exportFeedbackCSV(getSelectedEventId())
+    );
   }
 
   // Re-render analytics when the Reports tab is entered

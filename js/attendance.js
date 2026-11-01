@@ -609,15 +609,32 @@ const renderRoster = () => {
 
   const rosterListEl = rosterList;
   const rosterEmptyEl = rosterEmpty;
+  const rosterFilterToolbarEl = rosterFilterToolbar;
 
-  if (regs.length === 0) {
+  // Distinguish empty database from empty filter match
+  if (allRegs.length === 0) {
+    // No registrations exist at all: show generic empty state, hide list + toolbar
     if (rosterEmptyEl) rosterEmptyEl.hidden = false;
     if (rosterListEl) rosterListEl.hidden = true;
+    if (rosterFilterToolbarEl) rosterFilterToolbarEl.hidden = true;
     rosterTableBody.innerHTML = "";
     return;
   }
+
+  // Registrations exist: show list + toolbar, hide generic empty state
   if (rosterEmptyEl) rosterEmptyEl.hidden = true;
   if (rosterListEl) rosterListEl.hidden = false;
+  if (rosterFilterToolbarEl) rosterFilterToolbarEl.hidden = false;
+
+  if (regs.length === 0) {
+    // Registrations exist but none match current search/filter criteria
+    rosterTableBody.innerHTML = "";
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td colspan="8" style="text-align:center; padding: var(--space-lg); color: var(--color-text-muted);">No registrations match the current search or filter criteria.</td>';
+    rosterTableBody.appendChild(tr);
+    return;
+  }
 
   rosterTableBody.innerHTML = "";
   regs.forEach((reg) => {
