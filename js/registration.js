@@ -122,6 +122,23 @@ const openRegistrationModal = (eventId) => {
   }
   fieldEventId.value = eventId;
   form.reset();
+
+  // Pre-fill form fields from the active student profile when it matches an
+  // existing student record (still allowing the user to type different details).
+  const activeStudentId = StorageService.getActiveStudentId();
+  if (activeStudentId) {
+    const regs = StorageService.getRegistrations();
+    const existing = regs.find((r) => r.studentId === activeStudentId);
+    if (existing) {
+      fieldName.value = existing.name || "";
+      fieldStudentId.value = existing.studentId || "";
+      fieldEmail.value = existing.email || "";
+      fieldDepartment.value = existing.department || "";
+    } else {
+      fieldStudentId.value = activeStudentId;
+    }
+  }
+
   if (dialogEl && typeof dialogEl.showModal === "function") {
     dialogEl.showModal();
   }
@@ -242,14 +259,14 @@ const handleRegistrationSubmit = (event) => {
   }
   renderPasses();
   try {
+    window.EventsModule?.render?.();
+    window.app?.renderHistory?.();
+    window.app?.renderDashboardStats?.();
     if (typeof window.app?.updateProfileChip === "function") {
       window.app.updateProfileChip(StorageService.getActiveRole() || "student");
     }
-    if (typeof window.app?.renderHistory === "function") {
-      window.app.renderHistory();
-    }
   } catch (_err) {
-    // non-fatal: profile chip / history update is cosmetic
+    // non-fatal: dashboard / history / chip update is cosmetic
   }
 };
 
@@ -262,6 +279,11 @@ const renderPassCard = (reg) => {
   card.style.cssText =
     "border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;";
 
+  // Normalize badge class to lowercase so .status-badge.present / .status-badge.registered
+  // in css/components.css match regardless of stored casing.
+  const statusVal = reg.attendance?.status || reg.status || "Registered";
+  const badgeCls = statusVal.toLowerCase();
+
   card.innerHTML = `
     <div class="pass-card-header">
       ${escapeHtml(event ? event.title : "Unknown Event")}
@@ -273,7 +295,7 @@ const renderPassCard = (reg) => {
         <span><strong>Ticket ID:</strong> ${escapeHtml(reg.regId)}</span>
         <span><strong>Date/Time:</strong> ${event ? formatDateTime(event.date) : "—"}</span>
         <span><strong>Venue:</strong> ${escapeHtml(event ? event.venue : "—")}</span>
-        <span><strong>Status:</strong> <span class="status-badge ${reg.attendance ? reg.attendance.status : reg.status || "Registered"}">${escapeHtml(reg.attendance ? reg.attendance.status : reg.status || "Registered")}</span></span>
+        <span><strong>Status:</strong> <span class="status-badge ${badgeCls}">${escapeHtml(statusVal)}</span></span>
       </div>
     </div>
     <div class="pass-card-actions">
