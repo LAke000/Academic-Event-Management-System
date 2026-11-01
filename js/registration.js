@@ -270,6 +270,7 @@ const renderPassCard = (reg) => {
         <button class="btn btn-outline-primary btn-view-qr" data-regid="${escapeHtml(
           reg.regId
         )}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">View QR Ticket</button>
+        <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs); border: 1px solid var(--color-primary); color: var(--color-primary); background: transparent; border-radius: var(--radius-md); margin-left: var(--space-sm);">Add Reminder (.ics)</button>
       </div>
     </div>
   `;
@@ -283,6 +284,43 @@ const renderPasses = () => {
   if (!passesList || !passesEmpty) return;
 
   const regs = StorageService.getRegistrations();
+  const reminders = StorageService.getReminders();
+
+  // Render Upcoming Event Reminders banner at the top of My Passes
+  const bannerWrap = passesList.parentElement;
+  let banner = document.getElementById("reminders-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "reminders-banner";
+    banner.className = "reminders-banner";
+    banner.style.cssText =
+      "margin-bottom: var(--space-lg); padding: var(--space-md); background: var(--color-surface-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md);";
+    bannerWrap.insertBefore(banner, passesList);
+  }
+
+  const upcomingReminders = reminders.filter(
+    (rem) => new Date(rem.sentAt) <= new Date()
+  );
+  const registeredUpcoming = regs.filter(
+    (r) => r.status === "Registered"
+  );
+
+  let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
+  if (upcomingReminders.length === 0 && registeredUpcoming.length === 0) {
+    bannerHtml += `<p style="margin:0; font-size: var(--font-sm); color: var(--color-text-muted);">No upcoming reminders.</p>`;
+  } else {
+    bannerHtml += `<ul style="margin:0; padding-left: var(--space-md); font-size: var(--font-sm);">`;
+    upcomingReminders.forEach((rem) => {
+      const event = StorageService.getEventById(rem.eventId);
+      bannerHtml += `<li style="margin-bottom: var(--space-xs);">${escapeHtml(rem.message || "")} ${event ? `— ${escapeHtml(event.title)}` : ""}</li>`;
+    });
+    registeredUpcoming.forEach((reg) => {
+      const event = StorageService.getEventById(reg.eventId);
+      bannerHtml += `<li style="margin-bottom: var(--space-xs);">Registered for ${event ? escapeHtml(event.title) : reg.eventId} (status: Registered).</li>`;
+    });
+    bannerHtml += `</ul>`;
+  }
+  banner.innerHTML = bannerHtml;
 
   passesList.innerHTML = "";
 
@@ -302,6 +340,13 @@ const renderPasses = () => {
   passesList.querySelectorAll(".btn-view-qr").forEach((btn) => {
     btn.addEventListener("click", () => {
       showPassQR(btn.dataset.regid);
+    });
+  });
+
+  passesList.querySelectorAll(".btn-add-reminder").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const event = StorageService.getEventById(btn.dataset.id);
+      if (event) downloadIcsReminder(event);
     });
   });
 };

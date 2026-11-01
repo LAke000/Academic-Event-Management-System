@@ -7,6 +7,7 @@
 const EVENTS_KEY = "academic_events_db";
 const REGISTRATIONS_KEY = "academic_registrations_db";
 const FEEDBACK_KEY = "academic_feedback_db";
+const REMINDERS_KEY = "academic_reminders_db";
 const ROLE_KEY = "academic_active_role";
 
 const DEFAULT_ROLE = "student";
@@ -187,6 +188,38 @@ class StorageService {
   }
 
   // ------------------------------------------------------------------
+  // Reminders
+  // ------------------------------------------------------------------
+
+  /**
+   * Returns the full array of stored organizer reminders.
+   * @returns {Array}
+   */
+  static getReminders() {
+    return this._read(REMINDERS_KEY, []);
+  }
+
+  /**
+   * Persists the full reminders array.
+   * @param {Array} reminders
+   * @returns {boolean}
+   */
+  static saveReminders(reminders) {
+    return this._write(REMINDERS_KEY, reminders);
+  }
+
+  /**
+   * Append a single reminder record to storage and return the saved record.
+   * @param {object} reminder - { reminderId, eventId, message, sentAt, sentToCount }
+   * @returns {boolean}
+   */
+  static saveReminder(reminder) {
+    const existing = this.getReminders();
+    existing.push(reminder);
+    return this._write(REMINDERS_KEY, existing);
+  }
+
+  // ------------------------------------------------------------------
   // Role
   // ------------------------------------------------------------------
 
@@ -218,6 +251,7 @@ class StorageService {
     localStorage.removeItem(EVENTS_KEY);
     localStorage.removeItem(REGISTRATIONS_KEY);
     localStorage.removeItem(FEEDBACK_KEY);
+    localStorage.removeItem(REMINDERS_KEY);
     localStorage.removeItem(ROLE_KEY);
     this.seedDemoData(true);
   }
@@ -414,6 +448,25 @@ class StorageService {
       },
     ];
     this.saveFeedback(feedback);
+
+    // ── 2 sample organizer reminders (reminders system) ──
+    const reminders = [
+      {
+        reminderId: "REM-9001",
+        eventId: "EVT-101",
+        message: "Reminder: Deep Learning & Computer Vision Workshop starts tomorrow at 09:00 in Audi-3 Block 34.",
+        sentAt: new Date(Date.now() - 86400000).toISOString(),
+        sentToCount: 2,
+      },
+      {
+        reminderId: "REM-9002",
+        eventId: "EVT-102",
+        message: "Reminder: Campus Cyber Defense Seminar is scheduled for 17 Nov 2026 at 14:00 in Room 401 Block 32.",
+        sentAt: new Date(Date.now() - 172800000).toISOString(),
+        sentToCount: 2,
+      },
+    ];
+    this.saveReminders(reminders);
   }
 }
 

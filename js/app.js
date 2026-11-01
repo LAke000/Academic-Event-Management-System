@@ -497,7 +497,7 @@ const renderHistory = () => {
     });
   });
 
-  // Wire feedback submissions
+  // Wire feedback submissions — open the student feedback dialog directly
   list.querySelectorAll(".history-item-feedback").forEach((el) => {
     el.addEventListener("click", () => {
       const regId = el.dataset.regid;
@@ -506,10 +506,10 @@ const renderHistory = () => {
         window.showToast("Registration not found.", "error");
         return;
       }
-      showTab("feedback");
-      // Pre-select the feedback dialog's event field if wired externally.
-      if (typeof window.showToast === "function") {
-        window.showToast(`Ready to submit feedback for registration ${regId}.`, "info");
+      if (typeof window.FeedbackModule?.openFeedbackDialog === "function") {
+        window.FeedbackModule.openFeedbackDialog(reg.eventId, reg.studentId);
+      } else {
+        window.showToast("Feedback module unavailable.", "error");
       }
     });
   });

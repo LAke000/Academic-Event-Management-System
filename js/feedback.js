@@ -123,10 +123,13 @@ const FeedbackModule = (() => {
   const openFeedbackDialog = (eventId, studentId) => {
     if (!feedbackDialog) return;
 
-    // Guard: check eligibility — must be Present
+    // Guard: check eligibility — must be Present (dual state for consistency)
     const regs = StorageService.getRegistrations();
     const reg = regs.find(
-      (r) => r.eventId === eventId && r.studentId === studentId && r.status === "Present"
+      (r) =>
+        r.eventId === eventId &&
+        r.studentId === studentId &&
+        (r.status === "Present" || (r.attendance && r.attendance.status === "Present"))
     );
     if (!reg) {
       if (typeof window.showToast === "function") {
@@ -251,6 +254,14 @@ const FeedbackModule = (() => {
 
     // Refresh admin dashboard if visible
     renderAdminDashboard();
+
+    // Refresh student history & dashboard stats so new feedback is reflected
+    if (typeof window.app?.renderHistory === "function") {
+      window.app.renderHistory();
+    }
+    if (typeof window.app?.renderDashboardStats === "function") {
+      window.app.renderDashboardStats();
+    }
   };
 
   // ─── Admin feedback dashboard ─────────────────────────────────────────────────
@@ -495,5 +506,15 @@ const FeedbackModule = (() => {
     renderAdminDashboard,
   };
 })();
+
+// Auto-init on DOMContentLoaded (matches attendance.js / certificate.js pattern)
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => FeedbackModule.init());
+} else {
+  FeedbackModule.init();
+}
+
+// Expose globally for cross-module access (e.g. app.js renderHistory)
+window.FeedbackModule = FeedbackModule;
 
 export default FeedbackModule;

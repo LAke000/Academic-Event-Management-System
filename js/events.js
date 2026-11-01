@@ -20,6 +20,9 @@ let btnCreateEvent = null;
 let btnCancelEvent = null;
 let formFields = {};
 
+// Track in-progress edit (null when creating a new event)
+let editingEventId = null;
+
 const resolveRefs = () => {
   discoverContainer = document.getElementById("discover-list");
   adminTableBody = document.querySelector("#events-table-body");
@@ -162,6 +165,39 @@ const renderDiscover = () => {
   const filtered = events.filter(
     (ev) => matchesSearch(ev, currentFilters.query) && matchesFilters(ev)
   );
+
+  const reminders = StorageService.getReminders();
+
+  // Render Upcoming Event Reminders banner at the top of Discover Events
+  const parent = discoverContainer.parentElement;
+  let banner = document.getElementById("reminders-banner-discover");
+  if (!banner && parent) {
+    banner = document.createElement("div");
+    banner.id = "reminders-banner-discover";
+    banner.className = "reminders-banner";
+    banner.style.cssText =
+      "margin-bottom: var(--space-lg); padding: var(--space-md); background: var(--color-surface-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md);";
+    parent.insertBefore(banner, discoverContainer);
+  }
+
+  const upcomingReminders = reminders.filter(
+    (rem) => new Date(rem.sentAt) <= new Date()
+  );
+
+  if (banner) {
+    let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
+    if (upcomingReminders.length === 0) {
+      bannerHtml += `<p style="margin:0; font-size: var(--font-sm); color: var(--color-text-muted);">No upcoming reminders.</p>`;
+    } else {
+      bannerHtml += `<ul style="margin:0; padding-left: var(--space-md); font-size: var(--font-sm);">`;
+      upcomingReminders.forEach((rem) => {
+        const event = StorageService.getEventById(rem.eventId);
+        bannerHtml += `<li style="margin-bottom: var(--space-xs);">${escapeHtml(rem.message || "")} ${event ? `— ${escapeHtml(event.title)}` : ""}</li>`;
+      });
+      bannerHtml += `</ul>`;
+    }
+    banner.innerHTML = bannerHtml;
+  }
 
   discoverContainer.innerHTML = "";
 
@@ -333,6 +369,9 @@ const renderAdminTable = () => {
       <td>${registeredCount}</td>
       <td><span class="badge ${ev.status === "Housefull" ? "bg-danger" : "bg-success"}">${escapeHtml(ev.status)}</span></td>
       <td>
+        <button class="btn btn-sm btn-outline btn-edit-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Edit</button>
+        <button class="btn btn-sm btn-ghost btn-view-roster" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Roster</button>
+        <button class="btn btn-sm btn-ghost btn-remind-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Remind</button>
         <button class="btn btn-sm btn-danger btn-delete" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Delete</button>
       </td>
     `;
@@ -343,6 +382,29 @@ const renderAdminTable = () => {
   adminTableBody.querySelectorAll(".btn-delete").forEach((btn) => {
     btn.addEventListener("click", () => {
       deleteEvent(btn.dataset.id);
+    });
+  });
+
+  // Edit event
+  adminTableBody.querySelectorAll(".btn-edit-event").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openEditEventDialog(btn.dataset.id);
+    });
+  });
+
+  // View roster for this event
+  adminTableBody.querySelectorAll(".btn-view-roster").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      showTab("roster");
+      // Roster tab renders all registrations; filtering is handled by roster
+      // rendering when an event filter is present (kept simple: navigate only).
+    });
+  });
+
+  // Send reminder to all registered attendees of this event
+  adminTableBody.querySelectorAll(".btn-remind-event").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      sendReminder(btn.dataset.id);
     });
   });
 };
@@ -373,6 +435,54 @@ const deleteEvent = (eventId) => {
   window.showToast(`Event ${eventId} deleted.`, "success");
 };
 
+/**
+ * Dispatch a reminder for all students registered for an event.
+ * Saves the reminder record via StorageService.saveReminder() and shows a
+ * confirmation toast. Zero-truncation: the reminder record is stored in full.
+ * @param {string} eventId
+ */
+const sendReminder = (eventId) => {
+  const event = StorageService.getEventById(eventId);
+  if (!event) {
+    window.showToast("Event not found.", "error");
+    return;
+  }
+
+  const regs = StorageService.getRegistrationsByEvent(eventId);
+  const attendees = regs.filter(
+    (r) => r.status === "Registered" || r.status === "Present"
+  );
+
+  if (attendees.length === 0) {
+    window.showToast(
+      `No registered attendees for "${event.title}".`,
+      "warning"
+    );
+    return;
+  }
+
+  const eventDate = event.date ? new Date(event.date).toLocaleString() : "—";
+  const reminder = {
+    reminderId: generateId("REM-", 6),
+    eventId: event.id,
+    message: `Reminder: "${event.title}" is coming up on ${eventDate} at ${event.venue || "the venue"}. Don't miss it!`,
+    sentAt: new Date().toISOString(),
+    sentToCount: attendees.length,
+  };
+
+  const saved = StorageService.saveReminder(reminder);
+  if (!saved) {
+    window.showToast("Failed to save reminder. Storage may be full.", "error");
+    return;
+  }
+
+  renderAdminTable();
+  window.showToast(
+    `Reminder sent to ${attendees.length} registered attendee(s) for ${escapeHtml(event.title)}.`,
+    "success"
+  );
+};
+
 // ─── Event creation modal ─────────────────────────────────────────────────
 
 const initCreateEventModal = () => {
@@ -399,6 +509,7 @@ const initCreateEventModal = () => {
   // Cancel button
   if (btnCancelEvent) {
     btnCancelEvent.addEventListener("click", () => {
+      resetCreateDialog();
       if (typeof createDialog.close === "function") createDialog.close();
     });
   }
@@ -408,12 +519,14 @@ const initCreateEventModal = () => {
     const closeBtn = createDialog.querySelector(".dialog-close");
     if (closeBtn) {
       closeBtn.addEventListener("click", () => {
+        resetCreateDialog();
         if (typeof createDialog.close === "function") createDialog.close();
       });
     }
     // Backdrop click
     createDialog.addEventListener("click", (e) => {
       if (e.target === createDialog && typeof createDialog.close === "function") {
+        resetCreateDialog();
         createDialog.close();
       }
     });
@@ -457,8 +570,10 @@ const initCreateEventModal = () => {
     } while (existingIds.includes(eventId));
 
     const deadline = formFields.deadline ? formFields.deadline.value : "";
-    const newEvent = {
-      id: eventId,
+
+    // Build the updated event payload (zero-truncation: preserve all fields)
+    const updatedEvent = {
+      id: editingEventId || eventId,
       title,
       type,
       department,
@@ -466,13 +581,28 @@ const initCreateEventModal = () => {
       date: new Date(dateTime).toISOString(),
       deadline: deadline ? new Date(deadline).toISOString() : "",
       capacity,
-      registered: 0,
+      // Preserve existing registered count when editing; 0 when creating new
+      registered: editingEventId
+        ? (events.find((ev) => ev.id === editingEventId)?.registered || 0)
+        : 0,
       status: "Open",
       speaker,
     };
 
-    events.push(newEvent);
-    const saved = StorageService.saveEvents(events);
+    let saved;
+    if (editingEventId) {
+      // Update existing event in place, preserving its id and registered count
+      const idx = events.findIndex((ev) => ev.id === editingEventId);
+      if (idx === -1) {
+        window.showToast("Event to update not found.", "error");
+        return;
+      }
+      events[idx] = updatedEvent;
+      saved = StorageService.saveEvents(events);
+    } else {
+      events.push(updatedEvent);
+      saved = StorageService.saveEvents(events);
+    }
 
     if (!saved) {
       window.showToast(
@@ -483,13 +613,72 @@ const initCreateEventModal = () => {
     }
 
     createForm.reset();
+    resetCreateDialog();
     if (typeof createDialog.close === "function") createDialog.close();
 
-    window.showToast("Event created successfully", "success");
+    window.showToast(
+      editingEventId ? "Event updated successfully" : "Event created successfully",
+      "success"
+    );
     renderDiscover();
     renderAdminTable();
     populateFilters();
   });
+};
+
+// ─── Event edit / update ──────────────────────────────────────────────────
+
+/**
+ * Open the create-event dialog pre-filled with an existing event for editing.
+ * @param {string} eventId
+ */
+const openEditEventDialog = (eventId) => {
+  const event = StorageService.getEventById(eventId);
+  if (!event) {
+    window.showToast("Event not found.", "error");
+    return;
+  }
+
+  editingEventId = eventId;
+
+  // Pre-fill form fields
+  if (formFields.title) formFields.title.value = event.title;
+  if (formFields.type) formFields.type.value = event.type || "";
+  if (formFields.department) formFields.department.value = event.department;
+  if (formFields.venue) formFields.venue.value = event.venue;
+  if (formFields.dateTime) {
+    // datetime-local expects "YYYY-MM-DDTHH:MM" (no seconds)
+    const d = new Date(event.date);
+    formFields.dateTime.value = d.toISOString().slice(0, 16);
+  }
+  if (formFields.capacity) formFields.capacity.value = event.capacity;
+  if (formFields.speaker) formFields.speaker.value = event.speaker;
+  if (formFields.deadline) {
+    formFields.deadline.value = event.deadline ? new Date(event.deadline).toISOString().slice(0, 16) : "";
+  }
+
+  // Update dialog title and submit button text
+  const dialogTitle = createDialog.querySelector(".dialog-header h2");
+  if (dialogTitle) dialogTitle.textContent = "Update Event";
+  const submitBtn = createForm.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = "Update Event";
+
+  if (typeof createDialog.showModal === "function") {
+    createDialog.showModal();
+  }
+};
+
+/**
+ * Reset the create/edit dialog to "create new event" mode.
+ */
+const resetCreateDialog = () => {
+  editingEventId = null;
+  if (createForm) createForm.reset();
+
+  const dialogTitle = createDialog.querySelector(".dialog-header h2");
+  if (dialogTitle) dialogTitle.textContent = "Create Event";
+  const submitBtn = createForm.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = "Create Event";
 };
 
 // ─── Registration modal bridge ────────────────────────────────────────────

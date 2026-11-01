@@ -195,18 +195,20 @@ const processQrPayload = (rawText) => {
 
   const reg = allRegs[regIndex];
 
-  // 4. Duplicate check — already marked Present
-  if (reg.status === "Present" && reg.checkInTime) {
+  // 4. Duplicate check — already marked Present (dual state for consistency)
+  if (reg.status === "Present" || reg.attendance?.status === "Present") {
+    const ts = reg.checkInTime ? formatDate(reg.checkInTime) : "—";
     return {
       ok: false,
       type: "warning",
-      message: `Already checked in at ${formatDate(reg.checkInTime)}. Duplicate scan ignored.`,
+      message: `Already checked in at ${ts}. Duplicate scan ignored.`,
     };
   }
 
   // 5. Mark as Present with timestamp (dual state for cross-module consistency)
   const checkInTime = new Date().toISOString();
   allRegs[regIndex].status = "Present";
+  allRegs[regIndex].checkInTime = checkInTime;
   allRegs[regIndex].attendance = { status: "Present", checkInTime };
   StorageService.saveRegistrations(allRegs);
 
@@ -390,7 +392,11 @@ const renderLiveCheckinFeed = () => {
   const regs = StorageService.getRegistrations();
   // Sort by checkInTime descending; show only "Present" entries
   const checkedIn = regs
-    .filter((r) => r.status === "Present" && r.checkInTime)
+    .filter(
+      (r) =>
+        (r.status === "Present" || r.attendance?.status === "Present") &&
+        r.checkInTime
+    )
     .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
 
   overrideTableBody.innerHTML = "";

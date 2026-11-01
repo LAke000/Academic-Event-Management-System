@@ -284,6 +284,34 @@
           <h2>Scanner Not Active</h2>
           <p>Click Start Camera to begin live QR scanning at the venue door.</p>
         </div>
+
+        <!-- Manual Check-In (moved inline into the scanner tab pane) -->
+        <div class="scanner-manual">
+          <h3>Manual Check-In</h3>
+          <div class="form-field compact">
+            <label class="form-label">Search Registration No.</label>
+            <input type="text" id="manual-checkin-search" placeholder="e.g. 12601928">
+          </div>
+          <button class="btn btn-primary" id="btn-manual-checkin">Check In Student</button>
+        </div>
+
+        <!-- Live Check-In Feed -->
+        <div id="scanner-override-list" class="override-table-wrap">
+          <table class="data-table compact">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Registration No.</th>
+                <th>Event</th>
+                <th>Status</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="scanner-override-body">
+              <!-- Live check-in feed rows injected by attendance.js -->
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ============================ FEEDBACK REVIEWS ============================ -->
@@ -435,33 +463,9 @@
             <button class="btn btn-ghost btn-sm" id="btn-camera-toggle">Switch Camera</button>
           </div>
         </div>
-        <div class="scanner-manual">
-          <h3>Manual Check-In</h3>
-          <div class="form-field compact">
-            <label class="form-label">Search Registration No.</label>
-            <input type="text" id="manual-checkin-search" placeholder="e.g. 12601928">
-          </div>
-          <button class="btn btn-primary" id="btn-manual-checkin">Check In Student</button>
-        </div>
         <div id="scan-toast-dialog" class="scan-toast" hidden>
           <span class="toast-icon">&#10004;</span>
           <span class="toast-message" id="scan-toast-dialog-message">Checked in successfully</span>
-        </div>
-        <div id="scanner-override-list" class="override-table-wrap">
-          <table class="data-table compact">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Registration No.</th>
-                <th>Event</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="scanner-override-body">
-              <!-- Override rows injected by attendance.js -->
-            </tbody>
-          </table>
         </div>
       </div>
       <footer class="dialog-footer">
