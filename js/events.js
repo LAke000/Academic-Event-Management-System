@@ -66,6 +66,14 @@ const badgeFor = (registeredCount, capacity) => {
   return { label: "Seats Available", cls: "bg-success" };
 };
 
+const toLocalDatetimeInput = (isoStr) => {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 // ─── Search / filter controls (defensive injection) ─────────────────────────
 
 // Injects a search bar and department/type filters at the top of the discover
@@ -196,8 +204,15 @@ const renderDiscover = () => {
     parent.insertBefore(bannerEl, discoverContainer);
   }
 
+  const activeStudentId = StorageService.getActiveStudentId();
+  const regs = activeStudentId && activeStudentId !== "ALL"
+    ? StorageService.getRegistrations().filter((r) => r.studentId === activeStudentId)
+    : StorageService.getRegistrations();
+  const registeredEventIds = new Set(regs.map((r) => r.eventId));
+
   const upcomingReminders = reminders.filter(
-    (rem) => new Date(rem.sentAt) <= new Date()
+    (rem) => new Date(rem.sentAt) <= new Date() &&
+      (activeStudentId === "ALL" || !activeStudentId || registeredEventIds.has(rem.eventId))
   );
 
   if (bannerEl) {
@@ -251,7 +266,7 @@ const renderDiscover = () => {
       "border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;";
 
     card.innerHTML = `
-      <div class="event-card-department">${escapeHtml(event.department)}</div>
+      <div class="event-card-department">${escapeHtml(event.department)} · ${escapeHtml(event.type || "Academic Event")}</div>
       <div class="event-card-body">
         <div class="event-card-meta">
           <h3 class="event-card-title">${escapeHtml(event.title)}</h3>
@@ -266,6 +281,10 @@ const renderDiscover = () => {
           <div class="meta-row">
             <span class="meta-icon">🎤</span>
             <span><strong>Speaker:</strong> ${escapeHtml(event.speaker || "—")}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-icon">⏳</span>
+            <span><strong>Deadline:</strong> ${event.deadline ? new Date(event.deadline).toLocaleString() : "Open until start"}</span>
           </div>
         </div>
         <div class="capacity-bar-wrap">
@@ -340,19 +359,17 @@ const populateFilters = () => {
 
   if (deptFilter) {
     const currentValue = deptFilter.value;
+    deptFilter.innerHTML = '<option value="">All Departments</option>';
     const departments = [
       ...new Set(events.map((ev) => ev.department).filter(Boolean)),
     ];
-    const existing = [...deptFilter.options].map((o) => o.value);
     departments.forEach((dept) => {
-      if (!existing.includes(dept)) {
-        const opt = document.createElement("option");
-        opt.value = dept;
-        opt.textContent = dept;
-        deptFilter.appendChild(opt);
-      }
+      const opt = document.createElement("option");
+      opt.value = dept;
+      opt.textContent = dept;
+      deptFilter.appendChild(opt);
     });
-    deptFilter.value = existing.includes(currentValue) ? currentValue : "";
+    deptFilter.value = [...deptFilter.options].map((o) => o.value).includes(currentValue) ? currentValue : "";
   }
 
   if (typeFilter) {
@@ -540,8 +557,10 @@ const sendReminder = (eventId) => {
   }
 
   renderAdminTable();
+  renderDiscover();
+  try { window.RegistrationModule?.renderPasses?.(); } catch (_err) {}
   window.showToast(
-    `Reminder sent to ${attendees.length} registered attendee(s) for ${escapeHtml(event.title)}.`,
+    `Reminder sent to ${attendees.length} registered attendee(s) for ${event.title}.`,
     "success"
   );
 };
@@ -554,7 +573,7 @@ const initCreateEventModal = () => {
   const emptyCreateBtn = document.getElementById("btn-create-event-empty");
   if (emptyCreateBtn) {
     emptyCreateBtn.addEventListener("click", () => {
-      createForm.reset();
+      resetCreateDialog();
       if (typeof createDialog.showModal === "function") createDialog.showModal();
     });
   }
@@ -563,7 +582,7 @@ const initCreateEventModal = () => {
 
   // Open dialog
   btnCreateEvent.addEventListener("click", () => {
-    createForm.reset();
+    resetCreateDialog();
     if (typeof createDialog.showModal === "function") {
       createDialog.showModal();
     }
@@ -593,6 +612,9 @@ const initCreateEventModal = () => {
         createDialog.close();
       }
     });
+
+    // Native Escape key close always resets editingEventId
+    createDialog.addEventListener("close", resetCreateDialog);
   }
 
   // Form submission
@@ -709,7 +731,13 @@ const initCreateEventModal = () => {
     renderDiscover();
     renderAdminTable();
     populateFilters();
-    window.app?.renderDashboardStats?.();
+    if (typeof window.app?.refreshAllModules === "function") {
+      window.app.refreshAllModules(StorageService.getActiveRole() || "admin");
+    } else {
+      renderDiscover();
+      renderAdminTable();
+      window.app?.renderDashboardStats?.();
+    }
   });
 };
 
@@ -811,6 +839,7 @@ const EventsModule = {
   init,
   render,
   renderAdminTable,
+  populateFilters,
   openRegistrationModal,
   deleteEvent,
 };

@@ -59,7 +59,7 @@ Because the project requires a pure client-side stack with zero backend, the app
 
 | Database Concept | `localStorage` Equivalent in this App |
 |---|---|
-| Database / Schema | Three named collections stored under keys: `events_db`, `registrations_db`, `feedback_db` |
+| Database / Schema | Four named collections stored under keys: `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db` |
 | Table / Collection | Each key holds a JSON array of objects with a fixed schema |
 | Row / Record | One object inside a collection (e.g., one event, one registration, one feedback entry) |
 | Primary Key | `id` for events, `regId` for registrations, composite `eventId + studentId` for feedback |
@@ -92,21 +92,21 @@ Because the project requires a pure client-side stack with zero backend, the app
 
 ## Feature Matrix
 
-| Capability | Student / Attendee Mode | Admin / Organizer Mode | Gate Delegate (Scan-Only) |
-|---|---|---|---|
-| Browse published events | &#10004; | &#10004; | |
-| Register for an event (deduplication enforced) | &#10004; | | |
-| View digital QR entry pass | &#10004; | | |
-| Check capacity / "Housefull" status | &#10004; | &#10004; | |
-| Create, edit, delete events | | &#10004; | |
-| View registrant roster | | &#10004; | |
-| Live QR camera scanning & check-in | | &#10004; | &#10004; (unlock code) |
-| Manual check-in override | | &#10004; | &#10004; |
-| Submit post-event feedback (gated to Present) | &#10004; | | |
-| Download participation certificate (gated to Present) | &#10004; | | |
-| Export registrations / attendance / feedback to CSV | | &#10004; | |
-| View Chart.js attendance analytics | | &#10004; | |
-| Seed demo academic data | | &#10004; | |
+| Capability | Student / Attendee Mode | Admin / Organizer Mode |
+|---|---|---|
+| Browse published events | &#10004; | &#10004; |
+| Register for an event (deduplication enforced) | &#10004; | |
+| View digital QR entry pass | &#10004; | |
+| Check capacity / "Housefull" status | &#10004; | &#10004; |
+| Create, edit, delete events | | &#10004; |
+| View registrant roster | | &#10004; |
+| Live QR camera scanning & check-in | | &#10004; |
+| Manual check-in override | | &#10004; |
+| Submit post-event feedback (gated to Present) | &#10004; | |
+| Download participation certificate (gated to Present) | &#10004; | |
+| Export registrations / attendance / feedback to CSV | | &#10004; |
+| View Chart.js attendance analytics | | &#10004; |
+| Seed demo academic data | | &#10004; |
 
 ---
 
@@ -116,11 +116,11 @@ Because the project requires a pure client-side stack with zero backend, the app
 2. **Capacity Enforcement:** Registration is disabled when `total_registered === event.capacity`. The UI displays **"Housefull"** and blocks further registration.
 3. **Gated Post-Event Access:** The Feedback form and Certificate download are only accessible if `attendance.status === "Present"`. Absent students cannot claim certificates.
 4. **Empty States:** User-friendly "Call to Action" screens appear when `localStorage` is empty (e.g., "No Events Created Yet → [Create Event]").
-5. **Scan-Only Gate Delegate:** Volunteers enter a scan code (e.g., `SCAN-CSE-2026`) to unlock the camera scanner without accessing admin data or event management views.
+5. **Camera Scanner Access:** The Live QR Scanner tab is available in Admin Mode for organizer check-in at venue doors. There is no separate scan-only gate delegate sub-view.
 
 ---
 
-## File Architecture (14 Files)
+## File Architecture (15 Files)
 
 ```
 academic-event-system/
@@ -138,7 +138,8 @@ academic-event-system/
 │   ├── attendance.js           # html5-qrcode scanner & manual override list
 │   ├── feedback.js             # Gated review form & star rating logic
 │   ├── certificate.js          # HTML5 <canvas> rendering & PNG download
-│   └── reports.js              # Native CSV Blob export & Chart.js integration
+│   ├── reports.js              # Native CSV Blob export & Chart.js integration
+│   └── utils.js                # Shared ID generator, deep clone, and ISO date formatter
 └── assets/
     └── beep.mp3                # Audio chime on successful QR scan
 ```
@@ -147,15 +148,16 @@ academic-event-system/
 
 | File | Responsibility |
 |---|---|
-| `index.html` | Semantic SPA shell: top bar, role toggle, sidebar navigation, 9 `tab-pane` sections, 5 `<dialog>` modals (Create Event, Digital Boarding Pass, Scanner, Feedback, Certificate), toast container, and all 8 module script imports. |
+| `index.html` | Semantic SPA shell: top bar, role toggle, sidebar navigation, 9 `tab-pane` sections, 4 `<dialog>` modals (Create Event, Digital Boarding Pass, Feedback, Certificate), toast container, and all 8 module script imports. |
 | `css/main.css` | CSS custom properties (design tokens: navy `#1e3a8a`, slate grays), reset rules, layout grid, responsive sidebar and main viewport. |
 | `css/components.css` | Reusable components: cards, data tables, badges (Open / Housefull / Registered / Present), toast alerts, star-rating, form fields, buttons, empty states. |
 | `css/print.css` | `@media print` stylesheet for QR passes and certificates — hides nav/buttons, optimizes for paper output. |
-| `js/storage.js` | `localStorage` wrapper: `get`, `set`, `remove` for `events_db`, `registrations_db`, `feedback_db`. Demo Data Seeder populates synthetic campus events and registrations. |
+| `js/storage.js` | `localStorage` wrapper: `get`, `set`, `remove` for `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db`. Demo Data Seeder populates synthetic campus events and registrations. |
+| `js/utils.js` | Shared helpers: `generateId()` for unique IDs, `deepClone()` for record integrity, `formatDate()` for ISO date formatting. |
 | `js/events.js` | Event CRUD operations, dynamic capacity counting, "Housefull" badge rendering, event card/table row generation. |
 | `js/registration.js` | Student registration flow, deduplication logic (`studentId` + `eventId`), QR pass generation via `qrcode.min.js`, pass modal rendering. |
 | `js/attendance.js` | `html5-qrcode.min.js` webcam integration, live QR scanning, manual check-in override, attendance status toggling, check-in toast feed. |
-| `js/feedback.js` | Gated feedback form (only if `attendance.status === "Present"`), 5-star interactive rating, comment textarea, submission to `feedback_db`. |
+| `js/feedback.js` | Gated feedback form (only if `attendance.status === "Present"`), 5-star interactive rating, comment textarea, submission to `academic_feedback_db`. |
 | `js/certificate.js` | HTML5 `<canvas>` certificate rendering (student name, event title, date), PNG download, print certificate action. |
 | `js/reports.js` | Native CSV Blob export (no server), Chart.js integration for attendance/turnout analytics, export buttons for registrations/attendance/feedback. |
 | `js/app.js` | SPA router: tab switching, role-switching (Student ⇄ Admin), sidebar active state, empty-state toggling, global toast dispatcher, module initialization. |
@@ -230,17 +232,17 @@ All date/time values use ISO 8601 strings. The values shown above are synthetic/
 ### Option A: Direct browser execution (no tooling)
 
 1. Download or clone the `academic-event-system/` folder.
-2. Double-click `index.html` — it opens directly in your default browser.
-3. The app runs entirely offline; no install, no `npm`, no server, no build step.
+2. **Important:** Because the app uses ES6 modules (`<script type="module">`), it must be served over HTTP/HTTPS — it will not work when opened via `file://`. Use Option B (Live Server) or any local static server.
+3. The app runs entirely offline once served; no install, no `npm`, no build step.
 
-### Option B: VS Code Live Server (recommended for development)
+### Option B: VS Code Live Server (recommended)
 
 1. Open the `academic-event-system/` folder in Visual Studio Code.
 2. Install the **Live Server** extension (Ritwick Dey) if not already installed.
 3. Right-click `index.html` → **Open with Live Server**.
 4. The app opens at `http://127.0.0.1:5500/index.html` with live reload.
 
-**Browser note:** The Live QR Scanner requires camera permissions. When prompted, grant camera access so the gate delegate can scan QR passes. If the camera is blocked, the manual registration and roster flows still work.
+**Browser note:** The Live QR Scanner requires camera permissions. When prompted, grant camera access so organizers can scan QR passes at the venue door. If the camera is blocked, the manual registration and roster flows still work.
 
 ---
 
@@ -267,5 +269,5 @@ Instructions for professors and evaluators:
 - **Zero backend:** No server, no SQL database, no Node.js/Python.
 - **Vanilla stack only:** Pure HTML5, CSS3, ES6+ JavaScript. No React, Vue, Tailwind, or Bootstrap.
 - **Data persistence:** Browser `localStorage` only, using the schemas defined above.
-- **File architecture:** Strictly the 14-file structure above. No unnecessary files.
+- **File architecture:** Strictly the 15-file structure above. No unnecessary files.
 - **External libraries:** Only the three approved CDNs (qrcode.min.js, html5-qrcode.min.js, Chart.js).

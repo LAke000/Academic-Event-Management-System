@@ -151,7 +151,7 @@ const renderAnalytics = () => {
         (r.status === "Present" || r.attendance?.status === "Present")
     ).length;
 
-  const eventLabels = events.map((ev) => escapeHtml(ev.title || ev.id));
+  const eventLabels = events.map((ev) => ev.title || ev.id);
   const registeredData = events.map(registeredForEvent);
   const presentData = events.map(presentForEvent);
 

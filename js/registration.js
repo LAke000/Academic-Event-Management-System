@@ -126,7 +126,7 @@ const openRegistrationModal = (eventId) => {
   // Pre-fill form fields from the active student profile when it matches an
   // existing student record (still allowing the user to type different details).
   const activeStudentId = StorageService.getActiveStudentId();
-  if (activeStudentId) {
+  if (activeStudentId && activeStudentId !== "ALL") {
     const regs = StorageService.getRegistrations();
     const existing = regs.find((r) => r.studentId === activeStudentId);
     if (existing) {
@@ -417,9 +417,9 @@ const downloadIcsReminder = (event) => {
     `DTSTAMP:${dtstamp}`,
     `DTSTART:${dtstart}`,
     `DTEND:${dtend}`,
-    `SUMMARY:${escapeHtml(event.title)}`,
-    `DESCRIPTION:${escapeHtml(event.title + " — " + (event.department || ""))}`,
-    `LOCATION:${escapeHtml(event.venue || "—")}`,
+    `SUMMARY:${event.title}`,
+    `DESCRIPTION:${event.title + " — " + (event.department || "")}`,
+    `LOCATION:${event.venue || "—"}`,
     "BEGIN:VALARM",
     "ACTION:DISPLAY",
     "DESCRIPTION:Reminder",
@@ -440,7 +440,7 @@ const downloadIcsReminder = (event) => {
   URL.revokeObjectURL(url);
 
   window.showToast(
-    `Calendar reminder downloaded for "${escapeHtml(event.title)}".`,
+    `Calendar reminder downloaded for "${event.title}".`,
     "success"
   );
 };
@@ -461,12 +461,12 @@ const showPassQR = (regId) => {
   // Populate pass detail fields.
   if (passBadge) passBadge.textContent = reg.attendance ? reg.attendance.status : reg.status || "Registered";
   if (passTitle) passTitle.textContent = event ? event.title : "Unknown Event";
-  if (passDepartment) passDepartment.textContent = escapeHtml(reg.department);
-  if (passVenue) passVenue.textContent = event ? escapeHtml(event.venue) : "—";
+  if (passDepartment) passDepartment.textContent = reg.department || "";
+  if (passVenue) passVenue.textContent = event ? event.venue : "—";
   if (passDateTime) passDateTime.textContent = event ? formatDateTime(event.date) : "—";
-  if (passStudentId) passStudentId.textContent = escapeHtml(reg.studentId);
-  if (passEmail) passEmail.textContent = escapeHtml(reg.email);
-  if (passRegId) passRegId.textContent = `Ticket ID: ${escapeHtml(reg.regId)}`;
+  if (passStudentId) passStudentId.textContent = reg.studentId || "";
+  if (passEmail) passEmail.textContent = reg.email || "";
+  if (passRegId) passRegId.textContent = `Ticket ID: ${reg.regId}`;
 
   // Clear existing children from the QR container, then render a fresh QR code.
   if (qrTarget) {

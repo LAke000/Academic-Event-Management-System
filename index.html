@@ -99,7 +99,7 @@
           <h2>No Events Created Yet</h2>
           <p>There are no upcoming events published at the moment. Please check back later.</p>
           <div class="empty-actions">
-            <button class="btn btn-primary admin-only" onclick="app.seedDemoData()">Load Demo Academic Data</button>
+            <button class="btn btn-primary admin-only" onclick="app.seedDemoData(true)">Load Demo Academic Data</button>
             <button class="btn btn-ghost admin-only" onclick="app.showTab('dashboard')">View Admin Dashboard</button>
           </div>
         </div>
@@ -270,6 +270,7 @@
           <div class="scanner-controls">
             <button class="btn btn-primary" id="btn-start-scanner">Start Camera</button>
             <button class="btn btn-ghost" id="btn-stop-scanner" disabled>Stop Camera</button>
+            <button class="btn btn-ghost" id="btn-camera-toggle">Switch Camera</button>
           </div>
         </div>
         <div id="scanner-view" class="scanner-view" hidden>
@@ -290,7 +291,7 @@
           <h3>Manual Check-In</h3>
           <div class="form-field compact">
             <label class="form-label">Search Registration No.</label>
-            <input type="text" id="manual-checkin-search" placeholder="e.g. 12601928">
+            <input type="text" id="manual-checkin-search" placeholder="e.g. REG-8822 or 12601929">
           </div>
           <button class="btn btn-primary" id="btn-manual-checkin">Check In Student</button>
         </div>
@@ -445,32 +446,6 @@
       <footer class="dialog-footer">
         <button class="btn btn-ghost" id="btn-print-pass">Print Pass</button>
         <button class="btn btn-primary" id="btn-close-pass">Close</button>
-      </footer>
-    </div>
-  </dialog>
-
-  <!-- ============================ DIALOG: ATTENDANCE SCANNER ============================ -->
-  <dialog id="scanner-dialog" class="dialog dialog-wide">
-    <div class="dialog-panel">
-      <header class="dialog-header">
-        <h2>Live QR Scanner</h2>
-        <button class="dialog-close" aria-label="Close scanner dialog">&times;</button>
-      </header>
-      <div class="scanner-dialog-body">
-        <div class="scanner-preview-wrap">
-          <div class="reader"></div>
-          <div class="camera-controls">
-            <button class="btn btn-ghost btn-sm" id="btn-camera-toggle">Switch Camera</button>
-          </div>
-        </div>
-        <div id="scan-toast-dialog" class="scan-toast" hidden>
-          <span class="toast-icon">&#10004;</span>
-          <span class="toast-message" id="scan-toast-dialog-message">Checked in successfully</span>
-        </div>
-      </div>
-      <footer class="dialog-footer">
-        <button class="btn btn-ghost" id="btn-stop-scanner-dialog">Stop Scanner</button>
-        <button class="btn btn-primary" id="btn-close-scanner">Close</button>
       </footer>
     </div>
   </dialog>

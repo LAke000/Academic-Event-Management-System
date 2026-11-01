@@ -152,7 +152,7 @@ const drawCertificate = (ctx, reg, event) => {
   // ── Student name: large bold serif ──
   ctx.font = "bold 34px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(escapeHtml(reg.name), w / 2, 295);
+  ctx.fillText(reg.name || "", w / 2, 295);
 
   // ── Citation ──
   ctx.font = "19px 'Georgia', 'Times New Roman', serif";
@@ -160,18 +160,18 @@ const drawCertificate = (ctx, reg, event) => {
   ctx.fillText("for actively attending and successfully completing", w / 2, 345);
   ctx.font = "bold 21px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(escapeHtml(event ? event.title : "Unknown Event"), w / 2, 375);
+  ctx.fillText(event ? event.title : "Unknown Event", w / 2, 375);
 
   // ── Metadata line: Date, Venue, Verification ID ──
   ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
   ctx.fillStyle = "#94a3b8";
   const dateStr = event ? formatDate(event.date) : "—";
   ctx.textAlign = "left";
-  ctx.fillText(`Date: ${escapeHtml(dateStr)}`, 130, 455);
+  ctx.fillText(`Date: ${dateStr}`, 130, 455);
   ctx.textAlign = "center";
-  ctx.fillText(`Venue: ${escapeHtml(event ? event.venue : "—")}`, w / 2, 455);
+  ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 455);
   ctx.textAlign = "right";
-  ctx.fillText(`Verification ID: ${escapeHtml(reg.regId)}`, w - 130, 455);
+  ctx.fillText(`Verification ID: ${reg.regId || ""}`, w - 130, 455);
 
   // ── Divider ──
   ctx.strokeStyle = "#cbd5e1";

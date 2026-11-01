@@ -105,6 +105,8 @@ resolveRefs();
 let html5QrCode = null;
 let scannerRunning = false;
 let scanCooldown = false; // prevents rapid duplicate scans
+let currentFacingMode = "environment"; // "environment" (rear) or "user" (selfie)
+
 
 // ─── Audio feedback ───────────────────────────────────────────────────────
 /**
@@ -291,6 +293,12 @@ const manualCheckIn = (query) => {
   });
   StorageService.saveRegistrations(allRegs);
   renderLiveCheckinFeed();
+  renderRoster();
+  // Synchronize Student ⇄ Admin state mutations across all views.
+  window.app?.renderDashboardStats?.();
+  window.app?.renderHistory?.();
+  window.RegistrationModule?.renderPasses?.();
+  window.EventsModule?.render?.();
 
   const names = pending.map((r) => r.name).join(", ");
   return {
@@ -304,7 +312,7 @@ const manualCheckIn = (query) => {
 /**
  * Start the Html5Qrcode camera scanner on `<div id="reader">`.
  */
-const startScanner = async () => {
+const startScanner = async (facingMode) => {
   if (scannerRunning) return;
 
   // Guard: library must be loaded via CDN
@@ -319,11 +327,15 @@ const startScanner = async () => {
     return;
   }
 
+  if (typeof facingMode === "string" && (facingMode === "environment" || facingMode === "user")) {
+    currentFacingMode = facingMode;
+  }
+
   try {
     html5QrCode = new Html5Qrcode(READER_ID);
 
     await html5QrCode.start(
-      { facingMode: "environment" }, // prefer rear camera
+      { facingMode: currentFacingMode }, // prefer rear camera
       { fps: 10, qrbox: { width: 250, height: 250 } },
       onScanSuccess,
       onScanFailure
@@ -396,6 +408,7 @@ const onScanSuccess = (decodedText, _decodedResult) => {
     window.app?.renderHistory?.();
     window.RegistrationModule?.renderPasses?.();
     window.EventsModule?.render?.();
+    window.ReportsModule?.renderCharts?.();
   }
 };
 
@@ -645,6 +658,7 @@ const renderRoster = () => {
         window.app?.renderHistory?.();
         window.RegistrationModule?.renderPasses?.();
         window.EventsModule?.render?.();
+        window.ReportsModule?.renderCharts?.();
       }
     });
   });
@@ -689,10 +703,21 @@ const escapeHtml = (str) => {
 const bindEvents = () => {
   // Inline scanner controls (scanner tab)
   if (btnStartScanner) {
-    btnStartScanner.addEventListener("click", startScanner);
+    btnStartScanner.addEventListener("click", () => startScanner());
   }
   if (btnStopScanner) {
     btnStopScanner.addEventListener("click", stopScanner);
+  }
+
+  // Camera toggle (switch front/rear camera)
+  if (document.getElementById("btn-camera-toggle")) {
+    document.getElementById("btn-camera-toggle").addEventListener("click", async () => {
+      const newMode = currentFacingMode === "environment" ? "user" : "environment";
+      if (scannerRunning) {
+        await stopScanner();
+      }
+      await startScanner(newMode);
+    });
   }
 
   // Scanner dialog controls
@@ -734,6 +759,7 @@ const bindEvents = () => {
         window.app?.renderHistory?.();
         window.RegistrationModule?.renderPasses?.();
         window.EventsModule?.render?.();
+        window.ReportsModule?.renderCharts?.();
       }
     });
   }

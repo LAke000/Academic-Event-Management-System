@@ -140,7 +140,7 @@ window.showToast = (message, type = "info") => {
 
   const msg = document.createElement("span");
   msg.className = "toast-message";
-  msg.textContent = escapeHtml(message);
+  msg.textContent = typeof message === "string" ? message : String(message ?? "");
   el.appendChild(msg);
 
   // Animate in with inline styles (no CSS dependency).
@@ -348,7 +348,8 @@ const updateProfileChip = (role) => {
  */
 const refreshAllModules = (role) => {
   renderDashboardStats();
-  try { EventsModule?.render?.(); } catch (_err) {}
+  try { window.EventsModule?.populateFilters?.(); } catch (_err) {}
+  try { window.EventsModule?.render?.(); } catch (_err) {}
   try { window.RegistrationModule?.renderPasses?.(); } catch (_err) {}
   try { renderHistory(); } catch (_err) {}
   try { window.AttendanceModule?.renderRoster?.(); } catch (_err) {}
@@ -722,10 +723,12 @@ const app = {
   showTab,
   renderHistory,
   updateProfileChip,
-  seedDemoData: (force = false) => {
+  refreshAllModules,
+  seedDemoData: (force = true) => {
     try {
       StorageService.seedDemoData(force);
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      refreshAllModules(role);
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {
         window.showToast("Demo academic data loaded.", "success");
