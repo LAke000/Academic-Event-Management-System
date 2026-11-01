@@ -4,6 +4,7 @@
 // digital pass rendering, and QR ticket generation.
 
 import StorageService from "./storage.js";
+import { generateId, formatDate } from "./utils.js";
 
 // ─── DOM IDs ──────────────────────────────────────────────────────────────
 // index.html does not ship a registration dialog, so this module injects one.
@@ -182,6 +183,12 @@ const handleRegistrationSubmit = (event) => {
   }
   if (existingRegs.length >= (ev.capacity || 0)) {
     window.showToast("Event is at full capacity.", "error");
+    return;
+  }
+
+  // Deadline gate — registration must close before the event deadline.
+  if (ev.deadline && new Date() > new Date(ev.deadline)) {
+    window.showToast("Registration deadline has passed for this event.", "error");
     return;
   }
 

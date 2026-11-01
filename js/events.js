@@ -182,6 +182,9 @@ const renderDiscover = () => {
     const fillPercent =
       capacity > 0 ? Math.round((registeredCount / capacity) * 100) : 0;
     const isFull = registeredCount >= capacity;
+    const isPastDeadline =
+      event.deadline && new Date() > new Date(event.deadline);
+    const isClosed = isFull || isPastDeadline;
     const badge = badgeFor(registeredCount, capacity);
 
     const card = document.createElement("div");
@@ -216,15 +219,15 @@ const renderDiscover = () => {
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-sm);">
           <small style="color: var(--color-text-muted);">${registeredCount}/${capacity} seats</small>
-          <button class="btn btn-primary btn-register" data-id="${event.id}" ${isFull ? "disabled" : ""} style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">
-            ${isFull ? "Full" : "Register Now"}
+          <button class="btn btn-primary btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""} style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">
+            ${isClosed ? (isPastDeadline ? "Deadline Passed" : "Full") : "Register Now"}
           </button>
         </div>
       </div>
     `;
 
     const btn = card.querySelector(".btn-register");
-    if (btn && !isFull) {
+    if (btn && !isClosed) {
       btn.addEventListener("click", () => {
         openRegistrationModal(event.id);
       });
@@ -453,6 +456,7 @@ const initCreateEventModal = () => {
       eventId = generateId("EVT-", 4);
     } while (existingIds.includes(eventId));
 
+    const deadline = formFields.deadline ? formFields.deadline.value : "";
     const newEvent = {
       id: eventId,
       title,
@@ -460,6 +464,7 @@ const initCreateEventModal = () => {
       department,
       venue,
       date: new Date(dateTime).toISOString(),
+      deadline: deadline ? new Date(deadline).toISOString() : "",
       capacity,
       registered: 0,
       status: "Open",
