@@ -13,6 +13,8 @@ let adminTableBody = null;
 let searchInput = null;
 let deptFilter = null;
 let typeFilter = null;
+let availFilter = null;
+let dateFilterInput = null;
 
 let createDialog = null;
 let createForm = null;
@@ -41,6 +43,8 @@ const resolveRefs = () => {
     department: document.getElementById("event-department"),
     venue: document.getElementById("event-venue"),
     dateTime: document.getElementById("event-datetime"),
+    endTime: document.getElementById("event-endtime"),
+    description: document.getElementById("event-description"),
     capacity: document.getElementById("event-capacity"),
     speaker: document.getElementById("event-speaker"),
     deadline: document.getElementById("event-deadline"),
@@ -87,8 +91,11 @@ const ensureDiscoverControls = () => {
   const needsSearch = !alreadyHas("event-search-input");
   const needsDept = !alreadyHas("dept-filter-select");
   const needsType = !alreadyHas("type-filter-select");
+  const needsAvail = !alreadyHas("avail-filter-select");
+  const needsDate = !alreadyHas("date-filter-input");
 
-  if (!needsSearch && !needsDept && !needsType) return;
+  if (!needsSearch && !needsDept && !needsType && !needsAvail && !needsDate)
+    return;
 
   const bar = document.createElement("div");
   bar.className = "discover-controls";
@@ -130,6 +137,28 @@ const ensureDiscoverControls = () => {
     bar.appendChild(select);
   }
 
+  if (needsAvail) {
+    const select = document.createElement("select");
+    select.id = "avail-filter-select";
+    select.innerHTML =
+      '<option value="">Availability</option>' +
+      '<option value="available">Seats Available</option>' +
+      '<option value="full">Housefull</option>';
+    select.style.cssText =
+      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 170px; background: var(--color-surface); color: var(--color-text-primary);";
+    bar.appendChild(select);
+  }
+
+  if (needsDate) {
+    const input = document.createElement("input");
+    input.type = "date";
+    input.id = "date-filter-input";
+    input.placeholder = "Filter by date";
+    input.style.cssText =
+      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 170px; background: var(--color-surface); color: var(--color-text-primary);";
+    bar.appendChild(input);
+  }
+
   const parent = discoverContainer.parentElement;
   if (parent) {
     parent.insertBefore(bar, discoverContainer);
@@ -141,7 +170,7 @@ const ensureDiscoverControls = () => {
 
 // ─── Filter state ───────────────────────────────────────────────────────────
 
-let currentFilters = { query: "", department: "", type: "" };
+let currentFilters = { query: "", department: "", type: "", availability: "", date: "" };
 
 const matchesSearch = (event, query) => {
   if (!query) return true;
@@ -158,10 +187,29 @@ const matchesSearch = (event, query) => {
   return terms.every((term) => haystack.includes(term));
 };
 
+const eventHasSeats = (event) => {
+  const registrations = StorageService.getRegistrationsByEvent(event.id);
+  return registrations.length < (event.capacity || 0);
+};
+
+const eventMatchesDate = (event, dateStr) => {
+  if (!dateStr) return true;
+  if (!event.date) return false;
+  const eventDate = new Date(event.date);
+  const filterDate = new Date(dateStr);
+  if (Number.isNaN(eventDate.getTime()) || Number.isNaN(filterDate.getTime()))
+    return false;
+  return eventDate.toDateString() === filterDate.toDateString();
+};
+
 const matchesFilters = (event) => {
   if (currentFilters.department && event.department !== currentFilters.department)
     return false;
   if (currentFilters.type && event.type !== currentFilters.type) return false;
+  if (currentFilters.availability === "available" && !eventHasSeats(event))
+    return false;
+  if (currentFilters.availability === "full" && eventHasSeats(event)) return false;
+  if (!eventMatchesDate(event, currentFilters.date)) return false;
   return true;
 };
 
@@ -288,9 +336,14 @@ const renderDiscover = () => {
             <span><strong>Speaker:</strong> ${escapeHtml(event.speaker || "—")}</span>
           </div>
           <div class="meta-row">
+            <span class="meta-icon">🕐</span>
+            <span><strong>End Time:</strong> ${event.endTime ? new Date(event.endTime).toLocaleString() : "—"}</span>
+          </div>
+          <div class="meta-row">
             <span class="meta-icon">⏳</span>
             <span><strong>Deadline:</strong> ${event.deadline ? new Date(event.deadline).toLocaleString() : "Open until start"}</span>
           </div>
+          ${event.description ? `<div class="meta-row description-row"><span class="meta-icon">📝</span><span><strong>Description:</strong> ${escapeHtml(event.description)}</span></div>` : ""}
         </div>
         <div class="capacity-bar-wrap">
           <div class="capacity-bar" style="width: ${Math.min(fillPercent, 100)}%; background: ${isFull ? "var(--status-housefull)" : fillPercent >= 80 ? "var(--status-pending)" : "var(--status-open)"};"></div>
@@ -354,6 +407,20 @@ const bindSearchAndFilter = () => {
   if (typeFilter) {
     typeFilter.addEventListener("change", (e) => {
       currentFilters.type = e.target.value;
+      renderDiscover();
+    });
+  }
+
+  if (availFilter) {
+    availFilter.addEventListener("change", (e) => {
+      currentFilters.availability = e.target.value;
+      renderDiscover();
+    });
+  }
+
+  if (dateFilterInput) {
+    dateFilterInput.addEventListener("change", (e) => {
+      currentFilters.date = e.target.value;
       renderDiscover();
     });
   }
@@ -486,6 +553,9 @@ const renderAdminTable = () => {
       sendReminder(btn.dataset.id);
     });
   });
+
+  // Render the organizer reminder log beneath the events table
+  renderAdminReminderLog();
 };
 
 // ─── Event deletion ────────────────────────────────────────────────────────
@@ -570,6 +640,66 @@ const sendReminder = (eventId) => {
     `Reminder sent to ${attendees.length} registered attendee(s) for ${event.title}.`,
     "success"
   );
+};
+
+// ─── Organizer reminder log ───────────────────────────────────────────────────
+
+/**
+ * Render the organizer reminder log beneath the events table.
+ * Shows all saved reminders for organizer review. Defensive: creates the log
+ * container if index.html hasn't declared one, and never throws if the parent
+ * is missing.
+ */
+const renderAdminReminderLog = () => {
+  let logEl = document.getElementById("reminder-log");
+  if (!logEl) {
+    const adminCard = document.querySelector("#events .admin-card, #events section");
+    const parent = adminCard ? adminCard.parentElement : document.getElementById("events");
+    if (!parent) return;
+    logEl = document.createElement("div");
+    logEl.id = "reminder-log";
+    logEl.className = "reminder-log";
+    logEl.style.cssText =
+      "margin-top: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface);";
+    const heading = document.createElement("h3");
+    heading.textContent = "Reminder Log";
+    heading.style.cssText = "margin: 0 0 var(--space-sm) 0; font-size: var(--font-md); color: var(--color-text-primary);";
+    logEl.appendChild(heading);
+    parent.appendChild(logEl);
+  }
+
+  const reminders = StorageService.getReminders();
+  const entries = reminders.slice().reverse(); // newest first
+
+  logEl.innerHTML = "";
+  const heading = document.createElement("h3");
+  heading.textContent = "Reminder Log";
+  heading.style.cssText = "margin: 0 0 var(--space-sm) 0; font-size: var(--font-md); color: var(--color-text-primary);";
+  logEl.appendChild(heading);
+
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = "No reminders sent yet.";
+    empty.style.cssText = "margin: 0; font-size: var(--font-sm); color: var(--color-text-muted);";
+    logEl.appendChild(empty);
+    return;
+  }
+
+  const ul = document.createElement("ul");
+  ul.style.cssText = "margin: 0; padding-left: var(--space-md); font-size: var(--font-sm);";
+  entries.forEach((rem) => {
+    const event = rem.eventId ? StorageService.getEventById(rem.eventId) : null;
+    const li = document.createElement("li");
+    li.style.cssText = "margin-bottom: var(--space-xs); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-xs);";
+    li.innerHTML = `
+      <div style="font-size: var(--font-xs); color: var(--color-text-muted);">${escapeHtml(rem.sentAt || "")}</div>
+      <div style="margin-top: var(--space-xs);">${escapeHtml(rem.message || "")}</div>
+      ${event ? `<div style="font-size: var(--font-xs); color: var(--color-text-secondary); margin-top: var(--space-xs);">Event: ${escapeHtml(event.title)}</div>` : ""}
+      <div style="font-size: var(--font-xs); color: var(--color-text-secondary); margin-top: var(--space-xs);">Sent to ${rem.sentToCount ?? 0} attendee(s).</div>
+    `;
+    ul.appendChild(li);
+  });
+  logEl.appendChild(ul);
 };
 
 // ─── Event creation modal ─────────────────────────────────────────────────

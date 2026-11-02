@@ -152,48 +152,64 @@ const drawCertificate = (ctx, reg, event) => {
   // ── Student name: large bold serif ──
   ctx.font = "bold 34px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(reg.name || "", w / 2, 295);
+  ctx.fillText(reg.name || "", w / 2, 285);
 
-  // ── Citation ──
+  // ── Roll No ──
   ctx.font = "19px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText("for actively attending and successfully completing", w / 2, 345);
+  ctx.fillText(`Roll No: ${reg.studentId || ""}`, w / 2, 320);
+
+  // ── Category ──
+  ctx.font = "19px 'Georgia', 'Times New Roman', serif";
+  ctx.fillStyle = "#64748b";
+  ctx.fillText(`Category: ${event ? event.type : ""}`, w / 2, 360);
+
+  // ── Event title ──
   ctx.font = "bold 21px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(event ? event.title : "Unknown Event", w / 2, 375);
+  ctx.fillText(event ? event.title : "Unknown Event", w / 2, 395);
+
+  // ── Department ──
+  ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.fillStyle = "#64748b";
+  ctx.fillText(
+    `Department: ${event ? event.department : ""} · ${reg.department || ""}`,
+    w / 2,
+    425
+  );
 
   // ── Metadata line: Date, Venue, Verification ID ──
   ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
   ctx.fillStyle = "#94a3b8";
   const dateStr = event ? formatDate(event.date) : "—";
   ctx.textAlign = "left";
-  ctx.fillText(`Date: ${dateStr}`, 130, 455);
+  ctx.fillText(`Date: ${dateStr}`, 130, 465);
   ctx.textAlign = "center";
-  ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 455);
+  ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 465);
   ctx.textAlign = "right";
-  ctx.fillText(`Verification ID: ${reg.regId || ""}`, w - 130, 455);
+  ctx.fillText(`Verification ID: ${reg.regId || ""}`, w - 130, 465);
 
   // ── Divider ──
   ctx.strokeStyle = "#cbd5e1";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(130, 490);
-  ctx.lineTo(w - 130, 490);
+  ctx.moveTo(130, 505);
+  ctx.lineTo(w - 130, 505);
   ctx.stroke();
 
-  // ── Signature placeholder lines ──
+  // ── Signature placeholder lines (above labels at y=568) ──
   ctx.font = "14px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = "#475569";
   ctx.textAlign = "center";
-  ctx.fillText("Event Coordinator", w / 4, 600);
-  ctx.fillText("Dean of Academics", (3 * w) / 4, 600);
+  ctx.fillText("Event Coordinator", w / 4, 595);
+  ctx.fillText("Dean of Academics", (3 * w) / 4, 595);
   ctx.strokeStyle = "#94a3b8";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(w / 4 - 100, 580);
-  ctx.lineTo(w / 4 + 100, 580);
-  ctx.moveTo((3 * w) / 4 - 100, 580);
-  ctx.lineTo((3 * w) / 4 + 100, 580);
+  ctx.moveTo(w / 4 - 100, 568);
+  ctx.lineTo(w / 4 + 100, 568);
+  ctx.moveTo((3 * w) / 4 - 100, 568);
+  ctx.lineTo((3 * w) / 4 + 100, 568);
   ctx.stroke();
 
   // ── Corner decorative seal (bottom-left) ──

@@ -169,6 +169,18 @@
             <span class="stat-value" id="stat-feedback">0</span>
             <span class="stat-label">Feedback</span>
           </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-turnout-rate">0%</span>
+            <span class="stat-label">Turnout / Conversion Rate</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-noshow-rate">0%</span>
+            <span class="stat-label">No-Show Rate</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-avg-rating">—</span>
+            <span class="stat-label">Average Event Rating</span>
+          </div>
         </div>
         <div class="dashboard-actions">
           <button class="btn btn-primary" id="btn-load-demo">Load Demo Academic Data</button>
@@ -247,6 +259,7 @@
                 <th>Registration No.</th>
                 <th>Event</th>
                 <th>Email</th>
+                <th>Registered At</th>
                 <th>Attendance</th>
                 <th>Check-In Time</th>
                 <th>Actions</th>
@@ -290,10 +303,17 @@
         <div class="scanner-manual">
           <h3>Manual Check-In</h3>
           <div class="form-field compact">
+            <label class="form-label">Target Event</label>
+            <select id="scanner-event-select" class="filter-select">
+              <option value="">All Events</option>
+            </select>
+          </div>
+          <div class="form-field compact">
             <label class="form-label">Search Registration No.</label>
-            <input type="text" id="manual-checkin-search" placeholder="e.g. REG-8822 or 12601929">
+            <input type="text" id="manual-checkin-search" placeholder="e.g. REG-8822, 12601929, or paste full QR JSON">
           </div>
           <button class="btn btn-primary" id="btn-manual-checkin">Check In Student</button>
+          <button class="btn btn-ghost" id="btn-manual-absent">Mark Absent</button>
         </div>
 
         <!-- Live Check-In Feed -->
@@ -369,7 +389,7 @@
         <h2>Create Event</h2>
         <button class="dialog-close" aria-label="Close dialog">&times;</button>
       </header>
-      <form id="event-create-form">
+      <form id="event-create-form" novalidate>
         <div class="form-grid">
           <div class="form-field full-width">
             <label class="form-label" for="event-title">Event Title</label>
@@ -399,6 +419,10 @@
             <input type="datetime-local" id="event-datetime" name="dateTime" required>
           </div>
           <div class="form-field">
+            <label class="form-label" for="event-endtime">End Date &amp; Time</label>
+            <input type="datetime-local" id="event-endtime" name="endTime">
+          </div>
+          <div class="form-field">
             <label class="form-label" for="event-capacity">Seat Capacity</label>
             <input type="number" id="event-capacity" name="capacity" required min="1" max="500" placeholder="e.g. 60">
           </div>
@@ -409,6 +433,10 @@
           <div class="form-field">
             <label class="form-label" for="event-deadline">Registration Deadline</label>
             <input type="datetime-local" id="event-deadline" name="deadline" required>
+          </div>
+          <div class="form-field full-width">
+            <label class="form-label" for="event-description">Event Description</label>
+            <textarea id="event-description" name="description" rows="3" placeholder="Brief summary of topics, prerequisites, and learning outcomes..."></textarea>
           </div>
         </div>
         <footer class="dialog-footer">
@@ -445,6 +473,7 @@
       </div>
       <footer class="dialog-footer">
         <button class="btn btn-ghost" id="btn-print-pass">Print Pass</button>
+        <button class="btn btn-outline" id="btn-copy-qr-payload">Copy QR Payload</button>
         <button class="btn btn-primary" id="btn-close-pass">Close</button>
       </footer>
     </div>
@@ -469,6 +498,38 @@
             <input type="radio" name="rating" id="star1" value="1"><label for="star1" class="star-label">&#9733;</label>
           </div>
           <p class="form-hint" id="star-hint">Select a rating to continue.</p>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="form-label" for="fb-speaker-quality">Speaker Quality</label>
+            <select id="fb-speaker-quality" name="speakerQuality" required>
+              <option value="5">5 - Excellent</option>
+              <option value="4">4 - Very Good</option>
+              <option value="3">3 - Good</option>
+              <option value="2">2 - Fair</option>
+              <option value="1">1 - Poor</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fb-content-relevance">Content Relevance</label>
+            <select id="fb-content-relevance" name="contentRelevance" required>
+              <option value="5">5 - Excellent</option>
+              <option value="4">4 - Very Good</option>
+              <option value="3">3 - Good</option>
+              <option value="2">2 - Fair</option>
+              <option value="1">1 - Poor</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fb-venue-organization">Venue / Organization</label>
+            <select id="fb-venue-organization" name="venueOrganization" required>
+              <option value="5">5 - Excellent</option>
+              <option value="4">4 - Very Good</option>
+              <option value="3">3 - Good</option>
+              <option value="2">2 - Fair</option>
+              <option value="1">1 - Poor</option>
+            </select>
+          </div>
         </div>
         <div class="form-field">
           <label class="form-label">Comments</label>

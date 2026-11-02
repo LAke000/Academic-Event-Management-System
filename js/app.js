@@ -492,6 +492,23 @@ const renderDashboardStats = () => {
     ).length;
     const feedbackCount = StorageService.getFeedback().length;
 
+    // Turnout / conversion rate: share of registrations that turned up Present.
+    const turnoutRate =
+      registrations.length > 0
+        ? Math.round((attended / registrations.length) * 100) + "%"
+        : "0%";
+    // No-show rate: share of registrations that never turned up.
+    const noshowRate =
+      registrations.length > 0
+        ? Math.round(((registrations.length - attended) / registrations.length) * 100) + "%"
+        : "0%";
+    // Average event rating across all feedback entries (1–5 scale).
+    const feedbacks = StorageService.getFeedback();
+    const avgRating =
+      feedbacks.length > 0
+        ? (feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbacks.length).toFixed(1) + " ★"
+        : "—";
+
     const set = (id, value) => {
       const el = document.getElementById(id);
       if (el) el.textContent = value;
@@ -500,6 +517,9 @@ const renderDashboardStats = () => {
     set("stat-registrations", registrations.length);
     set("stat-present", attended);
     set("stat-feedback", feedbackCount);
+    set("stat-turnout-rate", turnoutRate);
+    set("stat-noshow-rate", noshowRate);
+    set("stat-avg-rating", avgRating);
 
     const dashEmpty = document.getElementById("dashboard-empty");
     if (dashEmpty) dashEmpty.hidden = events.length > 0;
@@ -623,6 +643,9 @@ const renderHistory = () => {
     const isPresent =
       reg.status === "Present" ||
       (reg.attendance && reg.attendance.status === "Present");
+    const isAbsent =
+      reg.status === "Absent" ||
+      (reg.attendance && reg.attendance.status === "Absent");
     const checkInTimestamp = reg.checkInTime || reg.attendance?.checkInTime;
     const item = document.createElement("div");
     item.className = "history-item card";
@@ -631,9 +654,14 @@ const renderHistory = () => {
       ? formatDate(checkInTimestamp)
       : (event ? formatDate(event.date) : "—");
 
-    const statusBadge = isPresent
-      ? `<span class="status-badge status-badge--present">Present</span>`
-      : `<span class="status-badge status-badge--registered">Registered (Attendance Pending)</span>`;
+    let statusBadge = "";
+    if (isPresent) {
+      statusBadge = `<span class="status-badge status-badge--present">Present</span>`;
+    } else if (isAbsent) {
+      statusBadge = `<span class="status-badge status-badge--absent">Absent</span>`;
+    } else {
+      statusBadge = `<span class="status-badge status-badge--registered">Registered (Attendance Pending)</span>`;
+    }
 
     const metaLines = [
       `<span><strong>Roll No:</strong> ${escapeHtml(reg.studentId)}</span>`,
@@ -663,6 +691,13 @@ const renderHistory = () => {
         `<button class="history-item-download btn btn-ghost btn-sm" data-regid="${escapeHtml(
           reg.regId
         )}">Download Certificate</button>` +
+        `</div>`;
+    } else if (isAbsent) {
+      actionsHtml =
+        `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center;">` +
+        `<p class="history-item-note" style="margin:0; font-size: var(--font-xs); color: var(--color-danger, #dc2626); font-weight: 500;">
+          Marked Absent — Feedback and Certificate of Participation are locked.
+        </p>` +
         `</div>`;
     } else {
       actionsHtml =

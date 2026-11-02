@@ -8,6 +8,7 @@ import { formatDate } from "./utils.js";
 
 // ─── DOM IDs ──────────────────────────────────────────────────────────────
 const ATTENDANCE_CHART_ID = "attendanceChart";
+const CATEGORY_CHART_ID = "categoryChart";
 const DEPT_CHART_ID = "deptChart";
 const BTN_EXPORT_REGISTRATIONS_ID = "btn-export-registrations";
 const BTN_EXPORT_ATTENDANCE_ID = "btn-export-attendance";
@@ -17,6 +18,7 @@ const CHART_CARD_SELECTOR = ".chart-card";
 
 // ─── Chart instance management (destroy before re-render) ─────────────────
 let turnoutChart = null; // bar chart: registered vs present per event
+let categoryChart = null; // doughnut chart: registrations by event category / type
 let deptChart = null; // doughnut chart: registrations by department
 
 // ─── Cached DOM references (resolved lazily to survive late injection) ────
@@ -78,22 +80,39 @@ const downloadCSV = (headers, rows, filename) => {
 };
 
 /**
- * Ensure the department doughnut chart canvas exists in the reports tab.
- * index.html only ships #attendanceChart, so #deptChart is injected here.
+ * Ensure both the category popularity and department doughnut chart canvases
+ * exist in the reports tab. index.html only ships #attendanceChart.
  */
-const ensureDeptChartCanvas = () => {
-  if (document.getElementById(DEPT_CHART_ID)) return;
+const ensureChartCanvases = () => {
   const attendanceCanvas = document.getElementById(ATTENDANCE_CHART_ID);
   if (!attendanceCanvas) return;
-  const card = document.createElement("div");
-  card.className = "chart-card";
-  card.style.cssText = "margin-top: var(--space-lg);";
-  const canvas = document.createElement("canvas");
-  canvas.id = DEPT_CHART_ID;
-  canvas.width = 400;
-  canvas.height = 400;
-  card.appendChild(canvas);
-  attendanceCanvas.parentElement.insertAdjacentElement("afterend", card);
+
+  if (!document.getElementById(CATEGORY_CHART_ID)) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.style.cssText = "margin-top: var(--space-lg);";
+    const canvas = document.createElement("canvas");
+    canvas.id = CATEGORY_CHART_ID;
+    canvas.width = 400;
+    canvas.height = 400;
+    card.appendChild(canvas);
+    attendanceCanvas.parentElement.insertAdjacentElement("afterend", card);
+  }
+
+  if (!document.getElementById(DEPT_CHART_ID)) {
+    const prevCard =
+      document.getElementById(CATEGORY_CHART_ID)?.parentElement ||
+      attendanceCanvas.parentElement;
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.style.cssText = "margin-top: var(--space-lg);";
+    const canvas = document.createElement("canvas");
+    canvas.id = DEPT_CHART_ID;
+    canvas.width = 400;
+    canvas.height = 400;
+    card.appendChild(canvas);
+    prevCard.insertAdjacentElement("afterend", card);
+  }
 };
 
 // ─── Chart rendering ──────────────────────────────────────────────────────
@@ -113,14 +132,15 @@ const destroyChartInstance = (chartId) => {
 };
 
 /**
- * Render the turnout analytics: bar chart (registered vs present per event)
- * and doughnut chart (registrations by department).
+ * Render the turnout analytics: bar chart (registered vs present per event),
+ * category popularity doughnut chart, and department doughnut chart.
  */
 const renderAnalytics = () => {
-  ensureDeptChartCanvas();
+  ensureChartCanvases();
 
   const events = StorageService.getEvents();
   const registrations = StorageService.getRegistrations();
+  const allFeedback = StorageService.getFeedback();
 
   // ── Empty-state toggle: charts only make sense once events exist ──
   const hasEvents = events.length > 0;
@@ -164,10 +184,29 @@ const renderAnalytics = () => {
     }
   }
 
+  // ── Inject / populate live KPI summary bar (#reports-kpi-grid) ──
+  let kpiGrid = document.getElementById("reports-kpi-grid");
+  if (!kpiGrid) {
+    kpiGrid = document.createElement("div");
+    kpiGrid.id = "reports-kpi-grid";
+    kpiGrid.className = "stats-grid";
+    kpiGrid.style.cssText = "margin-bottom: var(--space-lg);";
+    const firstChartCard = document.querySelector("#reports .chart-card");
+    if (firstChartCard) {
+      firstChartCard.parentNode.insertBefore(kpiGrid, firstChartCard);
+    } else {
+      document.getElementById("reports")?.appendChild(kpiGrid);
+    }
+  }
+  if (kpiGrid) {
+    kpiGrid.hidden = !hasEvents;
+  }
+
   // No events: destroy any stale chart instances and bail out so empty
   // canvases are never left mounted behind the empty-state message.
   if (!hasEvents) {
     destroyChartInstance(ATTENDANCE_CHART_ID);
+    destroyChartInstance(CATEGORY_CHART_ID);
     destroyChartInstance(DEPT_CHART_ID);
     return;
   }
@@ -180,6 +219,58 @@ const renderAnalytics = () => {
   const scopedRegistrations = selectedEventId
     ? registrations.filter((r) => r.eventId === selectedEventId)
     : registrations;
+  const scopedFeedbacks = selectedEventId
+    ? allFeedback.filter((f) => f.eventId === selectedEventId)
+    : allFeedback;
+
+  // Render KPI grid cards (scoped to filter if selected)
+  const totalEvents = scopedEvents.length;
+  const totalRegs = scopedRegistrations.length;
+  const checkedIn = scopedRegistrations.filter(
+    (r) => r.status === "Present" || r.attendance?.status === "Present"
+  ).length;
+  const turnoutRate =
+    totalRegs > 0 ? Math.round((checkedIn / totalRegs) * 100) + "%" : "0%";
+  const noshowRate =
+    totalRegs > 0
+      ? Math.round(((totalRegs - checkedIn) / totalRegs) * 100) + "%"
+      : "0%";
+  const avgRating =
+    scopedFeedbacks.length > 0
+      ? (
+          scopedFeedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) /
+          scopedFeedbacks.length
+        ).toFixed(1) + " ★"
+      : "—";
+
+  if (kpiGrid) {
+    kpiGrid.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-value">${totalEvents}</div>
+        <div class="stat-label">Total Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${totalRegs}</div>
+        <div class="stat-label">Total Registrations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${checkedIn}</div>
+        <div class="stat-label">Checked-In Attendees</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${turnoutRate}</div>
+        <div class="stat-label">Turnout Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${noshowRate}</div>
+        <div class="stat-label">No-Show Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${avgRating}</div>
+        <div class="stat-label">Average Rating</div>
+      </div>
+    `;
+  }
 
   // ── Bar chart data: Total Registered vs Marked Present per event ──
   // Both series are derived from live registration records rather than the
@@ -198,6 +289,22 @@ const renderAnalytics = () => {
   const registeredData = scopedEvents.map(registeredForEvent);
   const presentData = scopedEvents.map(presentForEvent);
 
+  // ── Doughnut chart data: registrations grouped by event category (type) ──
+  const categoryCounts = {};
+  scopedRegistrations.forEach((r) => {
+    const ev = StorageService.getEventById(r.eventId);
+    const cat = ev?.type || "General";
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+  const categoryLabels =
+    Object.keys(categoryCounts).length > 0
+      ? Object.keys(categoryCounts)
+      : ["No Registrations"];
+  const categoryData =
+    Object.values(categoryCounts).length > 0
+      ? Object.values(categoryCounts)
+      : [0];
+
   // ── Doughnut chart data: registrations grouped by department ──
   const deptCounts = {};
   scopedRegistrations.forEach((r) => {
@@ -213,6 +320,7 @@ const renderAnalytics = () => {
 
   // ── Destroy prior instances to prevent canvas reuse / memory leaks ──
   destroyChartInstance(ATTENDANCE_CHART_ID);
+  destroyChartInstance(CATEGORY_CHART_ID);
   destroyChartInstance(DEPT_CHART_ID);
 
   // Guard: Chart.js must be loaded via CDN
@@ -266,6 +374,53 @@ const renderAnalytics = () => {
       },
     },
   });
+
+  const categoryCanvas = document.getElementById(CATEGORY_CHART_ID);
+  if (categoryCanvas) {
+    const categoryCtx = categoryCanvas.getContext("2d");
+    categoryChart = new Chart(categoryCtx, {
+      type: "doughnut",
+      data: {
+        labels: categoryLabels,
+        datasets: [
+          {
+            label: "Event Category Popularity",
+            data: categoryData,
+            backgroundColor: [
+              "#1e3a8a",
+              "#059669",
+              "#d97706",
+              "#7c3aed",
+              "#dc2626",
+              "#0891b2",
+              "#be185d",
+            ],
+            borderColor: "#ffffff",
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: "Event Category Popularity",
+            font: { size: 18, weight: "bold" },
+          },
+          legend: { position: "right" },
+          tooltip: {
+            callbacks: {
+              label: (ctx) =>
+                `${ctx.label}: ${ctx.parsed} registration${
+                  ctx.parsed !== 1 ? "s" : ""
+                }`,
+            },
+          },
+        },
+      },
+    });
+  }
 
   const deptCtx = document.getElementById(DEPT_CHART_ID).getContext("2d");
   deptChart = new Chart(deptCtx, {
@@ -432,6 +587,9 @@ const exportFeedbackCSV = (eventId) => {
     "Event ID",
     "Event Title",
     "Rating",
+    "Speaker Quality",
+    "Content Relevance",
+    "Venue/Organization",
     "Comments",
     "Created At",
   ];
@@ -446,6 +604,9 @@ const exportFeedbackCSV = (eventId) => {
       f.eventId,
       StorageService.getEventById(f.eventId)?.title || f.eventId,
       f.rating,
+      f.speakerQuality != null ? f.speakerQuality : "",
+      f.contentRelevance != null ? f.contentRelevance : "",
+      f.venueOrganization != null ? f.venueOrganization : "",
       f.comment || f.comments || "",
       f.timestamp || "",
     ];

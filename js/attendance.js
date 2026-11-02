@@ -24,6 +24,8 @@ const SCAN_TOAST_DIALOG_MESSAGE_ID = "scan-toast-dialog-message";
 // Manual check‑in elements (inside scanner dialog)
 const MANUAL_SEARCH_INPUT_ID = "manual-checkin-search";
 const BTN_MANUAL_CHECKIN_ID = "btn-manual-checkin";
+const BTN_MANUAL_ABSENT_ID = "btn-manual-absent";
+const SCANNER_EVENT_SELECT_ID = "scanner-event-select";
 
 // Roster tab
 const ROSTER_TABLE_BODY_ID = "roster-table-body";
@@ -55,6 +57,8 @@ let scanToastDialogMessage = null;
 
 let manualSearchInput = null;
 let btnManualCheckin = null;
+let btnManualAbsent = null;
+let scannerEventSelect = null;
 let overrideTableBody = null;
 
 let rosterTableBody = null;
@@ -86,6 +90,8 @@ const resolveRefs = () => {
 
   manualSearchInput = document.getElementById(MANUAL_SEARCH_INPUT_ID);
   btnManualCheckin = document.getElementById(BTN_MANUAL_CHECKIN_ID);
+  btnManualAbsent = document.getElementById(BTN_MANUAL_ABSENT_ID);
+  scannerEventSelect = document.getElementById(SCANNER_EVENT_SELECT_ID);
   overrideTableBody = document.getElementById(OVERRIDE_TABLE_BODY_ID);
 
   rosterTableBody = document.getElementById(ROSTER_TABLE_BODY_ID);
@@ -96,6 +102,7 @@ const resolveRefs = () => {
   rosterSearchInput = document.getElementById(ROSTER_SEARCH_INPUT_ID);
   rosterEventFilter = document.getElementById(ROSTER_EVENT_FILTER_ID);
   rosterStatusFilter = document.getElementById(ROSTER_STATUS_FILTER_ID);
+  scannerEventSelect = document.getElementById(SCANNER_EVENT_SELECT_ID);
 };
 
 // Resolve once at module load
@@ -182,11 +189,13 @@ const showScanToast = (message, type) => {
 // ─── Core verification engine ─────────────────────────────────────────────
 /**
  * Attempt to check in a student given a decoded QR payload string.
- * Returns an object describing the outcome so callers can react.
+ * Optionally rejects scans whose QR eventId does not match targetEventId
+ * (cross-event rejection).
  * @param {string} rawText - Raw QR code text (expected JSON).
+ * @param {string} [targetEventId] - Optional event id the scanned ticket must belong to.
  * @returns {{ ok: boolean, type: string, message: string }}
  */
-const processQrPayload = (rawText) => {
+const processQrPayload = (rawText, targetEventId) => {
   // 1. Safe JSON parse
   let payload;
   try {
@@ -199,6 +208,15 @@ const processQrPayload = (rawText) => {
   const { regId, eventId, studentId, name } = payload;
   if (!regId || !eventId || !studentId) {
     return { ok: false, type: "error", message: "Malformed QR payload — missing required fields." };
+  }
+
+  // Cross-event rejection: ticket belongs to a different event than the target.
+  if (targetEventId && eventId !== targetEventId) {
+    return {
+      ok: false,
+      type: "error",
+      message: `Ticket is for a different event (${eventId}). Expected ${targetEventId}.`,
+    };
   }
 
   // 3. Look up the registration record
@@ -241,6 +259,136 @@ const processQrPayload = (rawText) => {
     ok: true,
     type: "success",
     message: `✔ ${name || reg.name} (${studentId}) checked in for ${eventId}.`,
+  };
+};
+
+/**
+ * Mark attendance for registrations matching a query (Student ID / Reg ID /
+ * name, or a pasted full QR JSON payload). Supports both Present and Absent
+ * targets. Optionally scopes matching to targetEventId.
+ * Zero-truncation: only the targeted records' status/checkInTime change;
+ * every other field is preserved.
+ * @param {string} query - Student ID, Reg ID, name, or raw QR JSON text.
+ * @param {"Present"|"Absent"} targetStatus
+ * @param {string} [targetEventId] - Optional event id scope for matching.
+ * @returns {{ ok: boolean, type: string, message: string }}
+ */
+const markStudentAttendance = (query, targetStatus, targetEventId) => {
+  if (!query || query.trim() === "") {
+    return {
+      ok: false,
+      type: "error",
+      message: `Please enter a Student ID, Registration ID, name, or QR payload to mark ${targetStatus}.`,
+    };
+  }
+
+  const raw = query.trim();
+  const allRegs = StorageService.getRegistrations();
+
+  // Support pasting a full QR JSON payload: parse and resolve by regId/eventId/studentId.
+  let resolvedRegId = null;
+  let resolvedEventId = null;
+  let resolvedStudentId = null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.regId && parsed.eventId && parsed.studentId) {
+      resolvedRegId = parsed.regId;
+      resolvedEventId = parsed.eventId;
+      resolvedStudentId = parsed.studentId;
+    }
+  } catch (_err) {
+    // Not JSON — treat as a plain text query below.
+  }
+
+  const matches = allRegs.filter((r) => {
+    // If a QR payload resolved to specific ids, match exactly those.
+    if (resolvedRegId && resolvedEventId && resolvedStudentId) {
+      return (
+        r.regId === resolvedRegId &&
+        r.eventId === resolvedEventId &&
+        r.studentId === resolvedStudentId
+      );
+    }
+    const term = raw.toLowerCase();
+    const byId =
+      r.studentId.toLowerCase() === term ||
+      r.regId.toLowerCase() === term ||
+      (r.name && r.name.toLowerCase() === term);
+    // Honor event scope when a target event is set.
+    if (targetEventId && r.eventId !== targetEventId) return false;
+    return byId;
+  });
+
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      type: "error",
+      message: `No registration found matching "${raw}".`,
+    };
+  }
+
+  // Dual-state consistency helpers
+  const isRegPresent = (r) => r.status === "Present" || r.attendance?.status === "Present";
+  const isRegAbsent = (r) => r.status === "Absent" || r.attendance?.status === "Absent";
+
+  const now = new Date().toISOString();
+  let changed = 0;
+  let skipped = 0;
+  matches.forEach((match) => {
+    const idx = allRegs.findIndex((r) => r.regId === match.regId);
+    if (idx === -1) return;
+    const reg = allRegs[idx];
+
+    // Skip records already at the target status.
+    if (targetStatus === "Present" && isRegPresent(reg)) {
+      skipped++;
+      return;
+    }
+    if (targetStatus === "Absent" && isRegAbsent(reg)) {
+      skipped++;
+      return;
+    }
+
+    reg.status = targetStatus;
+    reg.checkInTime = targetStatus === "Present" ? now : null;
+    reg.attendance = {
+      status: targetStatus,
+      checkInTime: targetStatus === "Present" ? now : null,
+    };
+    changed++;
+  });
+
+  StorageService.saveRegistrations(allRegs);
+  renderLiveCheckinFeed();
+  renderRoster();
+
+  // Synchronize Student ⇄ Admin state mutations across all views.
+  window.app?.renderDashboardStats?.();
+  window.app?.renderHistory?.();
+  window.RegistrationModule?.renderPasses?.();
+  window.EventsModule?.render?.();
+  window.ReportsModule?.renderCharts?.();
+  window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
+
+  const statusWord = targetStatus === "Present" ? "checked in" : "marked absent";
+  if (changed > 0 && skipped > 0) {
+    return {
+      ok: true,
+      type: "success",
+      message: `✔ ${changed} registration(s) ${statusWord}; ${skipped} already at that status.`,
+    };
+  }
+  if (changed > 0) {
+    return {
+      ok: true,
+      type: "success",
+      message: `✔ ${changed} registration(s) ${statusWord}.`,
+    };
+  }
+  return {
+    ok: false,
+    type: "warning",
+    message: `All ${skipped} matching registration(s) already ${statusWord}.`,
   };
 };
 
@@ -402,7 +550,8 @@ const onScanSuccess = (decodedText, _decodedResult) => {
   scanCooldown = true;
   setTimeout(() => { scanCooldown = false; }, 2000);
 
-  const result = processQrPayload(decodedText);
+  const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+  const result = processQrPayload(decodedText, targetEventId || undefined);
   showScanToast(result.message, result.type);
 
   if (result.ok) {
@@ -521,6 +670,10 @@ const ensureFilterToolbar = () => {
   registeredOpt.value = "Registered";
   registeredOpt.textContent = "Registered";
   statusSelect.appendChild(registeredOpt);
+  const absentOpt = document.createElement("option");
+  absentOpt.value = "Absent";
+  absentOpt.textContent = "Absent";
+  statusSelect.appendChild(absentOpt);
 
   toolbar.appendChild(searchLabel);
   toolbar.appendChild(searchInput);
@@ -567,7 +720,11 @@ const applyRosterFilters = (regs) => {
     // Dual-state consistency: check both top-level and nested attendance status
     if (status) {
       const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
-      const effectiveStatus = isPresent ? "Present" : "Registered";
+      const isAbsent = reg.status === "Absent" || reg.attendance?.status === "Absent";
+      let effectiveStatus;
+      if (isPresent) effectiveStatus = "Present";
+      else if (isAbsent) effectiveStatus = "Absent";
+      else effectiveStatus = "Registered";
       if (effectiveStatus !== status) return false;
     }
     if (term) {
@@ -608,12 +765,36 @@ const populateEventFilter = () => {
 };
 
 /**
+ * Populate the scanner manual check-in "Target Event" dropdown with all known events.
+ * Defensive: no-op when the select element is not in the DOM.
+ */
+const populateScannerEventSelect = () => {
+  if (!scannerEventSelect) return;
+  const desiredValue = scannerEventSelect.value || "";
+  const events = StorageService.getEvents();
+  scannerEventSelect.innerHTML = '<option value="">All Events</option>';
+  events.forEach((ev) => {
+    const opt = document.createElement("option");
+    opt.value = ev.id;
+    opt.textContent = `${ev.title} (${ev.id})`;
+    scannerEventSelect.appendChild(opt);
+  });
+  const validIds = events.map((ev) => ev.id);
+  if (desiredValue && validIds.includes(desiredValue)) {
+    scannerEventSelect.value = desiredValue;
+  } else {
+    scannerEventSelect.value = "";
+  }
+};
+
+/**
  * Populate the Registrant Roster admin table with full registration data,
  * honoring the current filter state (search / event / status).
  */
 const renderRoster = () => {
   ensureFilterToolbar();
   populateEventFilter();
+  populateScannerEventSelect();
 
   if (!rosterTableBody) return;
   const allRegs = StorageService.getRegistrations();
@@ -643,7 +824,7 @@ const renderRoster = () => {
     rosterTableBody.innerHTML = "";
     const tr = document.createElement("tr");
     tr.innerHTML =
-      '<td colspan="8" style="text-align:center; padding: var(--space-lg); color: var(--color-text-muted);">No registrations match the current search or filter criteria.</td>';
+      '<td colspan="9" style="text-align:center; padding: var(--space-lg); color: var(--color-text-muted);">No registrations match the current search or filter criteria.</td>';
     rosterTableBody.appendChild(tr);
     return;
   }
@@ -653,9 +834,10 @@ const renderRoster = () => {
     const event = StorageService.getEventById(reg.eventId);
     // Dual-state consistency: check both top-level and nested attendance status
     const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
-    const statusBadge = isPresent
-      ? "<span class='badge badge--success'>Present</span>"
-      : "<span class='badge badge--pending'>Registered</span>";
+    const isAbsent = reg.status === "Absent" || reg.attendance?.status === "Absent";
+    const registeredAt = reg.registeredAt || reg.timestamp || "—";
+    const registeredAtDisplay =
+      registeredAt !== "—" ? formatDate(registeredAt) : "—";
     const ts = reg.checkInTime || reg.attendance?.checkInTime;
     const checkInDisplay = ts ? formatDate(ts) : "—";
 
@@ -666,20 +848,43 @@ const renderRoster = () => {
       `<td>${escapeHtml(reg.studentId)}</td>` +
       `<td>${event ? escapeHtml(event.title) : reg.eventId}</td>` +
       `<td>${escapeHtml(reg.email)}</td>` +
-      `<td>${statusBadge}</td>` +
+      `<td>${registeredAtDisplay}</td>` +
+      `<td><span class='badge ${isPresent ? "badge--success" : isAbsent ? "badge--danger" : "badge--pending"}'>${isPresent ? "Present" : isAbsent ? "Absent" : "Registered"}</span></td>` +
       `<td>${checkInDisplay}</td>` +
-      `<td>${!isPresent
-        ? `<button class="btn btn-sm btn-primary btn-checkin" data-regid="${reg.regId}">Check In</button>`
-        : "—"
-      }</td>`;
+      `<td>${isPresent
+        ? `<button class="btn btn-sm btn-ghost btn-mark-absent" data-regid="${reg.regId}" disabled title="Already marked Present.">Mark Absent</button>`
+        : `<button class="btn btn-sm btn-primary btn-mark-present" data-regid="${reg.regId}">Mark Present</button>`}
+        ${isAbsent
+          ? `<button class="btn btn-sm btn-ghost btn-mark-present" data-regid="${reg.regId}" disabled title="Already marked Absent.">Mark Present</button>`
+          : `<button class="btn btn-sm btn-outline btn-mark-absent" data-regid="${reg.regId}">Mark Absent</button>`}
+      </td>`;
     rosterTableBody.appendChild(tr);
   });
 
-  // Bind inline check‑in buttons
-  rosterTableBody.querySelectorAll(".btn-checkin").forEach((btn) => {
+  // Bind inline Mark Present / Mark Absent buttons
+  rosterTableBody.querySelectorAll(".btn-mark-present").forEach((btn) => {
     btn.addEventListener("click", () => {
       const regId = btn.dataset.regid;
-      const result = manualCheckIn(regId);
+      const result = markStudentAttendance(regId, "Present");
+      showScanToast(result.message, result.type);
+      if (result.ok) {
+        playChime();
+        renderRoster();
+        renderLiveCheckinFeed();
+        // Synchronize Student ⇄ Admin state mutations across all views.
+        window.app?.renderDashboardStats?.();
+        window.app?.renderHistory?.();
+        window.RegistrationModule?.renderPasses?.();
+        window.EventsModule?.render?.();
+        window.ReportsModule?.renderCharts?.();
+      }
+    });
+  });
+
+  rosterTableBody.querySelectorAll(".btn-mark-absent").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const regId = btn.dataset.regid;
+      const result = markStudentAttendance(regId, "Absent");
       showScanToast(result.message, result.type);
       if (result.ok) {
         playChime();
@@ -780,11 +985,33 @@ const bindEvents = () => {
     }
   }
 
-  // Manual check‑in
+  // Manual check‑in (Present)
   if (btnManualCheckin) {
     btnManualCheckin.addEventListener("click", () => {
       const query = manualSearchInput ? manualSearchInput.value : "";
-      const result = manualCheckIn(query);
+      const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+      const result = markStudentAttendance(query, "Present", targetEventId);
+      showScanToast(result.message, result.type);
+      if (result.ok) {
+        playChime();
+        if (manualSearchInput) manualSearchInput.value = "";
+        renderLiveCheckinFeed();
+        renderRoster();
+        // Synchronize Student ⇄ Admin state mutations across all views.
+        window.app?.renderDashboardStats?.();
+        window.app?.renderHistory?.();
+        window.RegistrationModule?.renderPasses?.();
+        window.EventsModule?.render?.();
+        window.ReportsModule?.renderCharts?.();
+      }
+    });
+  }
+  // Manual mark Absent
+  if (btnManualAbsent) {
+    btnManualAbsent.addEventListener("click", () => {
+      const query = manualSearchInput ? manualSearchInput.value : "";
+      const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+      const result = markStudentAttendance(query, "Absent", targetEventId);
       showScanToast(result.message, result.type);
       if (result.ok) {
         playChime();
@@ -852,6 +1079,8 @@ const AttendanceModule = {
   startScanner,
   stopScanner,
   manualCheckIn,
+  markStudentAttendance,
+  processQrPayload,
   renderRoster,
   renderLiveCheckinFeed,
   filterRosterByEvent,

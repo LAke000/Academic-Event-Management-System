@@ -174,6 +174,12 @@ const FeedbackModule = (() => {
     updateStarHint(0);
     if (feedbackForm) feedbackForm.reset();
     if (feedbackComments) feedbackComments.value = "";
+    // Reset categorical rating selectors
+    const catSelectors = ["fb-speaker-quality", "fb-content-relevance", "fb-venue-organization"];
+    catSelectors.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
     updateSubmitButton();
   };
 
@@ -212,6 +218,11 @@ const FeedbackModule = (() => {
 
     const comment = feedbackComments ? feedbackComments.value.trim() : "";
 
+    // Read categorical ratings (1–5 each)
+    const speakerQuality = parseInt(document.getElementById("fb-speaker-quality")?.value || "0", 10);
+    const contentRelevance = parseInt(document.getElementById("fb-content-relevance")?.value || "0", 10);
+    const venueOrganization = parseInt(document.getElementById("fb-venue-organization")?.value || "0", 10);
+
     // Validate comment — require at least a few characters of constructive input
     if (comment.length > 0 && comment.length < 5) {
       if (typeof window.showToast === "function") {
@@ -239,6 +250,9 @@ const FeedbackModule = (() => {
       eventId: activeEventIdForFeedback,
       studentId: activeStudentIdForFeedback,
       rating: selectedRating,
+      speakerQuality: speakerQuality || null,
+      contentRelevance: contentRelevance || null,
+      venueOrganization: venueOrganization || null,
       comment: comment,
       timestamp: new Date().toISOString(),
     };
@@ -460,12 +474,23 @@ const FeedbackModule = (() => {
     const event = StorageService.getEventById(fb.eventId);
     const eventTitle = event ? event.title : fb.eventId;
 
+    // Categorical rating breakdown (if present)
+    let categoricalHtml = "";
+    if (fb.speakerQuality || fb.contentRelevance || fb.venueOrganization) {
+      categoricalHtml = `<div class="review-categories" style="display:flex; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-sm); font-size: var(--font-xs); color: var(--color-text-secondary);">`;
+      if (fb.speakerQuality) categoricalHtml += `<span>Speaker: ${fb.speakerQuality}/5</span>`;
+      if (fb.contentRelevance) categoricalHtml += `<span>Content: ${fb.contentRelevance}/5</span>`;
+      if (fb.venueOrganization) categoricalHtml += `<span>Venue: ${fb.venueOrganization}/5</span>`;
+      categoricalHtml += `</div>`;
+    }
+
     card.innerHTML =
       `<div class="review-card-header">` +
         `<span class="review-student">${escapeHtml(studentName)}</span>` +
         starsHtml +
       `</div>` +
       `<p class="review-date">${escapeHtml(eventTitle)} · ${formatDate(fb.timestamp)}</p>` +
+      categoricalHtml +
       `${fb.comment
         ? `<p class="review-comment">${escapeHtml(fb.comment)}</p>`
         : '<p class="review-comment review-comment--empty">No written comments.</p>'

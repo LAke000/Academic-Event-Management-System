@@ -63,6 +63,7 @@ const fieldStudentId = document.getElementById("reg-student-id");
 const fieldEmail = document.getElementById("reg-email");
 const fieldDepartment = document.getElementById("reg-department");
 const btnCancel = document.getElementById("reg-cancel-btn");
+const btnClear = document.getElementById("reg-clear-btn");
 
 const passDialog = document.getElementById(PASS_DIALOG_ID);
 const qrTarget = document.getElementById(QR_TARGET_ID);
@@ -277,6 +278,59 @@ const handleRegistrationSubmit = (event) => {
   }
 };
 
+// ─── Registration cancellation ─────────────────────────────────────────────
+
+/**
+ * Cancel a registration by regId. Removes the registration record, decrements
+ * the event's registered count (and resets Housefull status when seats open),
+ * then re-renders affected views. Zero-truncation: only the targeted record is
+ * removed; no other fields or records are touched.
+ * @param {string} regId
+ * @returns {boolean} true when the cancellation was saved
+ */
+const cancelRegistration = (regId) => {
+  const regs = StorageService.getRegistrations();
+  const idx = regs.findIndex((r) => r.regId === regId);
+  if (idx === -1) {
+    window.showToast("Registration not found.", "error");
+    return false;
+  }
+
+  const reg = regs[idx];
+  const eventId = reg.eventId;
+
+  if (!confirm(`Cancel registration for "${escapeHtml(reg.name)}"? This cannot be undone.`)) {
+    return false;
+  }
+
+  regs.splice(idx, 1);
+  const saved = StorageService.saveRegistrations(regs);
+  if (!saved) {
+    window.showToast("Failed to cancel registration. Storage may be full.", "error");
+    return false;
+  }
+
+  // Decrement event registered count and reset Housefull status when seats open.
+  const allEvents = StorageService.getEvents();
+  const evIdx = allEvents.findIndex((ev) => ev.id === eventId);
+  if (evIdx >= 0) {
+    allEvents[evIdx].registered = Math.max(0, (allEvents[evIdx].registered || 0) - 1);
+    if (allEvents[evIdx].registered < allEvents[evIdx].capacity) {
+      allEvents[evIdx].status = "Open";
+    }
+    StorageService.saveEvents(allEvents);
+  }
+
+  window.showToast("Registration cancelled.", "success");
+  renderPasses();
+  try {
+    window.app?.refreshAllModules?.(StorageService.getActiveRole() || "student");
+  } catch (_err) {
+    // non-fatal
+  }
+  return true;
+};
+
 // ─── Digital pass rendering ───────────────────────────────────────────────
 
 const renderPassCard = (reg) => {
@@ -290,6 +344,7 @@ const renderPassCard = (reg) => {
   // in css/components.css match regardless of stored casing.
   const statusVal = reg.attendance?.status || reg.status || "Registered";
   const badgeCls = statusVal.toLowerCase();
+  const isPresent = statusVal === "Present";
 
   card.innerHTML = `
     <div class="pass-card-header">
@@ -306,6 +361,11 @@ const renderPassCard = (reg) => {
       </div>
     </div>
     <div class="pass-card-actions">
+      ${isPresent
+        ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>`
+        : `<button class="btn btn-outline btn-sm btn-drop-seat" data-regid="${escapeHtml(
+            reg.regId
+          )}" title="Cancel this registration and free the seat.">Drop Seat</button>`}
       <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(
         reg.regId
       )}">View QR Ticket</button>
@@ -388,6 +448,12 @@ const renderPasses = () => {
   passesList.querySelectorAll(".btn-view-qr").forEach((btn) => {
     btn.addEventListener("click", () => {
       showPassQR(btn.dataset.regid);
+    });
+  });
+
+  passesList.querySelectorAll(".btn-drop-seat").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      cancelRegistration(btn.dataset.regid);
     });
   });
 
@@ -603,6 +669,11 @@ const bindEvents = () => {
   if (btnCancel) {
     btnCancel.addEventListener("click", closeRegistrationModal);
   }
+  if (btnClear) {
+    btnClear.addEventListener("click", () => {
+      form.reset();
+    });
+  }
   if (dialogEl) {
     const closeBtn = dialogEl.querySelector(".dialog-close");
     if (closeBtn) {
@@ -635,6 +706,33 @@ const bindEvents = () => {
       window.print();
     });
   }
+
+  // Copy QR payload.
+  const btnCopyQrPayload = document.getElementById("btn-copy-qr-payload");
+  if (btnCopyQrPayload) {
+    btnCopyQrPayload.addEventListener("click", () => {
+      const active = passDialog?.querySelector("[data-regid]");
+      const regId = active ? active.dataset.regid : null;
+      if (!regId) {
+        window.showToast("No pass currently open.", "warning");
+        return;
+      }
+      const reg = StorageService.getRegistrationByRegId(regId);
+      if (!reg) {
+        window.showToast("Pass not found.", "error");
+        return;
+      }
+      const payload = buildQrPayload(reg);
+      navigator.clipboard
+        .writeText(payload)
+        .then(() => {
+          window.showToast("QR payload copied to clipboard.", "success");
+        })
+        .catch(() => {
+          window.showToast("Failed to copy QR payload.", "error");
+        });
+    });
+  }
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -658,6 +756,7 @@ const RegistrationModule = {
   handleRegistrationSubmit,
   renderPasses,
   showPassQR,
+  cancelRegistration,
 };
 
 // Expose globally for inline HTML handlers and cross-module access.
