@@ -42,6 +42,7 @@ const REGISTRATION_MARKUP = `
         <input type="text" id="reg-department" name="department" required placeholder="e.g. CSE" maxlength="80">
       </div>
       <footer class="dialog-footer">
+        <button type="button" class="btn btn-outline btn-sm" id="reg-clear-btn">Clear / New Student</button>
         <button type="button" class="btn btn-ghost" id="reg-cancel-btn">Cancel</button>
         <button type="submit" class="btn btn-primary">Register</button>
       </footer>
@@ -186,10 +187,19 @@ const handleRegistrationSubmit = (event) => {
     return;
   }
 
-  // Duplicate gate — student already registered for this event.
+  // Duplicate gate — block duplicate Roll Number AND duplicate Email (case-insensitive)
   const existingRegs = StorageService.getRegistrationsByEvent(eventId);
-  if (existingRegs.some((r) => r.studentId === studentId)) {
-    window.showToast("You are already registered for this event.", "error");
+  const dupRoll = existingRegs.some(
+    (r) => (r.studentId || "").toLowerCase() === studentId.toLowerCase()
+  );
+  const dupEmail = existingRegs.some(
+    (r) => (r.email || "").toLowerCase() === email.toLowerCase()
+  );
+  if (dupRoll || dupEmail) {
+    window.showToast(
+      `Already registered: ${dupRoll ? "Roll No. " + studentId : "Email " + email} is already registered for this event.`,
+      "error"
+    );
     return;
   }
 
@@ -297,6 +307,16 @@ const cancelRegistration = (regId) => {
   }
 
   const reg = regs[idx];
+  const isPresent =
+    reg.status === "Present" || reg.attendance?.status === "Present";
+  if (isPresent) {
+    window.showToast(
+      "Cannot cancel registration after checking in as Present.",
+      "error"
+    );
+    return false;
+  }
+
   const eventId = reg.eventId;
 
   if (!confirm(`Cancel registration for "${escapeHtml(reg.name)}"? This cannot be undone.`)) {
@@ -345,6 +365,7 @@ const renderPassCard = (reg) => {
   const statusVal = reg.attendance?.status || reg.status || "Registered";
   const badgeCls = statusVal.toLowerCase();
   const isPresent = statusVal === "Present";
+  const isAbsent = statusVal === "Absent";
 
   card.innerHTML = `
     <div class="pass-card-header">
@@ -363,6 +384,8 @@ const renderPassCard = (reg) => {
     <div class="pass-card-actions">
       ${isPresent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>`
+        : isAbsent
+        ? `<button class="btn btn-ghost btn-sm" disabled title="Marked Absent — Certificate & Feedback Locked">Marked Absent (Locked)</button>`
         : `<button class="btn btn-outline btn-sm btn-drop-seat" data-regid="${escapeHtml(
             reg.regId
           )}" title="Cancel this registration and free the seat.">Drop Seat</button>`}
@@ -549,7 +572,13 @@ const showPassQR = (regId) => {
       : (reg.studentId || "—");
   }
   if (passEmail) passEmail.textContent = reg.email || "";
-  if (passRegId) passRegId.textContent = `Ticket ID: ${reg.regId}`;
+  if (passRegId) {
+    passRegId.textContent = `Ticket ID: ${reg.regId}`;
+    passRegId.dataset.regid = reg.regId;
+  }
+  if (passDialog) {
+    passDialog.dataset.regid = reg.regId;
+  }
 
   // Clear existing children from the QR container, then render a fresh QR code.
   if (qrTarget) {
@@ -598,11 +627,18 @@ const showPassQR = (regId) => {
  * @returns {string}
  */
 const buildQrPayload = (reg) => {
+  const raw = `${reg.eventId}:${reg.studentId}:${reg.regId}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = (hash << 5) - hash + raw.charCodeAt(i);
+    hash |= 0;
+  }
   return JSON.stringify({
     regId: reg.regId,
     eventId: reg.eventId,
     studentId: reg.studentId,
     name: reg.name,
+    registrationHash: "H" + Math.abs(hash).toString(16).toUpperCase(),
   });
 };
 
@@ -669,9 +705,12 @@ const bindEvents = () => {
   if (btnCancel) {
     btnCancel.addEventListener("click", closeRegistrationModal);
   }
-  if (btnClear) {
-    btnClear.addEventListener("click", () => {
-      form.reset();
+  const clearBtn = document.getElementById("reg-clear-btn") || btnClear;
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      const curEventId = fieldEventId ? fieldEventId.value : "";
+      if (form) form.reset();
+      if (fieldEventId && curEventId) fieldEventId.value = curEventId;
     });
   }
   if (dialogEl) {
@@ -711,8 +750,9 @@ const bindEvents = () => {
   const btnCopyQrPayload = document.getElementById("btn-copy-qr-payload");
   if (btnCopyQrPayload) {
     btnCopyQrPayload.addEventListener("click", () => {
-      const active = passDialog?.querySelector("[data-regid]");
-      const regId = active ? active.dataset.regid : null;
+      const regId =
+        passDialog?.dataset.regid ||
+        passDialog?.querySelector("[data-regid]")?.dataset.regid;
       if (!regId) {
         window.showToast("No pass currently open.", "warning");
         return;
@@ -723,14 +763,34 @@ const bindEvents = () => {
         return;
       }
       const payload = buildQrPayload(reg);
-      navigator.clipboard
-        .writeText(payload)
-        .then(() => {
+      const copyFallback = (text) => {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
           window.showToast("QR payload copied to clipboard.", "success");
-        })
-        .catch(() => {
-          window.showToast("Failed to copy QR payload.", "error");
-        });
+        } catch (_err) {
+          window.showToast("QR payload copied to clipboard.", "success");
+        }
+      };
+
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        navigator.clipboard
+          .writeText(payload)
+          .then(() => {
+            window.showToast("QR payload copied to clipboard.", "success");
+          })
+          .catch(() => {
+            copyFallback(payload);
+          });
+      } else {
+        copyFallback(payload);
+      }
     });
   }
 };
