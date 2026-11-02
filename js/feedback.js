@@ -21,6 +21,7 @@ const FeedbackModule = (() => {
   const feedbackEmpty = document.getElementById("feedback-empty");
 
   // ─── Internal state ───────────────────────────────────────────────────────────
+  let initialized = false;
   let selectedRating = 0;
   let activeEventIdForFeedback = null;
   let activeStudentIdForFeedback = null;
@@ -547,8 +548,12 @@ const FeedbackModule = (() => {
       btnCancelFeedback.addEventListener("click", closeFeedbackDialog);
     }
 
-    // Dialog close (× button in header)
+    // Dialog close (× button in header, backdrop, or native Escape key)
     if (feedbackDialog) {
+      feedbackDialog.addEventListener("close", () => {
+        activeEventIdForFeedback = null;
+        activeStudentIdForFeedback = null;
+      });
       const closeBtn = feedbackDialog.querySelector(".dialog-close");
       if (closeBtn) {
         closeBtn.addEventListener("click", closeFeedbackDialog);
@@ -570,15 +575,12 @@ const FeedbackModule = (() => {
         }
       });
     }
-
-    // Re‑render admin dashboard when the feedback tab is activated
-    document.querySelectorAll('.nav-link[data-tab="feedback"]').forEach((link) => {
-      link.addEventListener("click", () => renderAdminDashboard());
-    });
   };
 
   // ─── Public API ───────────────────────────────────────────────────────────────
   const init = () => {
+    if (initialized) return;
+    initialized = true;
     initStarWidget();
     bindEvents();
   };

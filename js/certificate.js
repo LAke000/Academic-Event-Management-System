@@ -189,7 +189,12 @@ const drawCertificate = (ctx, reg, event) => {
   ctx.textAlign = "center";
   ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 465);
   ctx.textAlign = "right";
-  ctx.fillText(`Verification ID: ${reg.regId || ""}`, w - 130, 465);
+  const certId =
+    "CERT-" +
+    (reg.eventId || "EVT") +
+    "-" +
+    (reg.regId || "").replace(/^REG-/, "");
+  ctx.fillText(`Verification ID: ${certId}`, w - 130, 465);
 
   // ── Divider ──
   ctx.strokeStyle = "#cbd5e1";
@@ -333,7 +338,12 @@ const printCertificate = () => {
 
 // ─── Event binding ────────────────────────────────────────────────────────
 
+let eventsBound = false;
+
 const bindEvents = () => {
+  if (eventsBound) return;
+  eventsBound = true;
+
   if (btnDownloadCert) {
     btnDownloadCert.addEventListener("click", downloadCertificate);
   }

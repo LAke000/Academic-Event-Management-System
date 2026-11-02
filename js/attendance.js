@@ -1104,22 +1104,6 @@ const bindEvents = () => {
     });
   }
 
-  // Re‑render roster when its tab is activated
-  document.querySelectorAll('.nav-link[data-tab="roster"]').forEach((link) => {
-    link.addEventListener("click", () => {
-      resolveRefs();
-      renderRoster();
-    });
-  });
-  // Re‑render feed when scanner tab is activated
-  document.querySelectorAll('.nav-link[data-tab="scanner"]').forEach((link) => {
-    link.addEventListener("click", () => {
-      resolveRefs();
-      populateScannerEventSelect();
-      renderLiveCheckinFeed();
-    });
-  });
-
   // Stop the camera scanner whenever the user navigates away from the
   // scanner tab, preventing camera lockups / persistent stream state.
   document.querySelectorAll("#sidebar-nav .nav-link[data-tab]").forEach((link) => {

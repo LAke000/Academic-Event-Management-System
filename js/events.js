@@ -1062,7 +1062,11 @@ const render = () => {
   renderAdminTable();
 };
 
+let initialized = false;
+
 const init = () => {
+  if (initialized) return;
+  initialized = true;
   resolveRefs();
   ensureDiscoverControls();
   resolveRefs(); // refresh after possible injection

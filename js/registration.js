@@ -812,12 +812,6 @@ const init = () => {
   if (initialized) return;
   initialized = true;
   bindEvents();
-  // Re-render passes when the My Passes tab is entered.
-  document.querySelectorAll('.nav-link[data-tab="passes"]').forEach((link) => {
-    link.addEventListener("click", () => {
-      renderPasses();
-    });
-  });
 };
 
 const RegistrationModule = {

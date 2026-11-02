@@ -138,6 +138,14 @@ const destroyChartInstance = (chartId) => {
 const renderAnalytics = () => {
   ensureChartCanvases();
 
+  // Early visibility check: if the #reports tab pane is currently hidden,
+  // skip Chart.js creation to avoid rendering on a 0x0 canvas.
+  // The router will invoke ReportsModule.renderCharts() when unhiding #reports.
+  const reportsSection = document.getElementById("reports");
+  if (reportsSection && reportsSection.hidden) {
+    return;
+  }
+
   const events = StorageService.getEvents();
   const registrations = StorageService.getRegistrations();
   const allFeedback = StorageService.getFeedback();
@@ -530,8 +538,8 @@ const exportRegistrationsCSV = (eventId) => {
     r.email,
     r.department,
     r.registeredAt || "",
-    r.status || "",
-    r.checkInTime || "",
+    r.status || r.attendance?.status || "Registered",
+    r.checkInTime || r.attendance?.checkInTime || "",
   ]);
   downloadCSV(
     headers,
@@ -576,8 +584,8 @@ const exportAttendanceCSV = (eventId) => {
     r.studentId,
     r.email,
     r.department,
-    r.status || "",
-    r.checkInTime || "",
+    r.status || r.attendance?.status || "Registered",
+    r.checkInTime || r.attendance?.checkInTime || "",
   ]);
   downloadCSV(
     headers,
@@ -667,14 +675,6 @@ const bindEvents = () => {
       () => exportFeedbackCSV(getSelectedEventId())
     );
   }
-
-  // Re-render analytics when the Reports tab is entered
-  document.querySelectorAll('.nav-link[data-tab="reports"]').forEach((link) => {
-    link.addEventListener("click", () => {
-      resolveRefs();
-      renderAnalytics();
-    });
-  });
 };
 
 // ─── Module export ────────────────────────────────────────────────────────
