@@ -283,6 +283,22 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
   }
 
   const raw = query.trim();
+
+  // Route Pasted QR JSON Through processQrPayload in markStudentAttendance
+  if (targetStatus === "Present" && raw.startsWith("{")) {
+    const res = processQrPayload(raw, targetEventId || undefined);
+    if (res.ok) {
+      renderRoster();
+      window.app?.renderDashboardStats?.();
+      window.app?.renderHistory?.();
+      window.RegistrationModule?.renderPasses?.();
+      window.EventsModule?.render?.();
+      window.ReportsModule?.renderCharts?.();
+      window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
+    }
+    return res;
+  }
+
   const allRegs = StorageService.getRegistrations();
 
   // Support pasting a full QR JSON payload: parse and resolve by regId/eventId/studentId.
@@ -298,6 +314,17 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
     }
   } catch (_err) {
     // Not JSON — treat as a plain text query below.
+  }
+
+  // Cross-event rejection for Absent status when JSON contains eventId
+  if (targetStatus === "Absent" && resolvedEventId) {
+    if (targetEventId && resolvedEventId !== targetEventId) {
+      return {
+        ok: false,
+        type: "error",
+        message: `Ticket is for a different event (${resolvedEventId}). Expected ${targetEventId}.`,
+      };
+    }
   }
 
   const matches = allRegs.filter((r) => {
@@ -330,6 +357,16 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
   // Dual-state consistency helpers
   const isRegPresent = (r) => r.status === "Present" || r.attendance?.status === "Present";
   const isRegAbsent = (r) => r.status === "Absent" || r.attendance?.status === "Absent";
+
+  // When checking in by plain ID/Roll No. and all matching records are already Present, include timestamp
+  if (targetStatus === "Present" && matches.every(isRegPresent)) {
+    const firstTs = matches[0].checkInTime || matches[0].attendance?.checkInTime;
+    return {
+      ok: false,
+      type: "warning",
+      message: `Already Marked Present at ${firstTs ? formatDate(firstTs) : "—"}. Duplicate check-in ignored.`,
+    };
+  }
 
   const now = new Date().toISOString();
   let changed = 0;
@@ -849,15 +886,14 @@ const renderRoster = () => {
       `<td>${event ? escapeHtml(event.title) : reg.eventId}</td>` +
       `<td>${escapeHtml(reg.email)}</td>` +
       `<td>${registeredAtDisplay}</td>` +
-      `<td><span class='badge ${isPresent ? "badge--success" : isAbsent ? "badge--danger" : "badge--pending"}'>${isPresent ? "Present" : isAbsent ? "Absent" : "Registered"}</span></td>` +
+      `<td><span class="badge ${isPresent ? "badge--success" : isAbsent ? "badge--absent" : "badge--warning"}">${isPresent ? "Present" : isAbsent ? "Absent" : "Registered"}</span></td>` +
       `<td>${checkInDisplay}</td>` +
-      `<td>${isPresent
-        ? `<button class="btn btn-sm btn-ghost btn-mark-absent" data-regid="${reg.regId}" disabled title="Already marked Present.">Mark Absent</button>`
-        : `<button class="btn btn-sm btn-primary btn-mark-present" data-regid="${reg.regId}">Mark Present</button>`}
-        ${isAbsent
-          ? `<button class="btn btn-sm btn-ghost btn-mark-present" data-regid="${reg.regId}" disabled title="Already marked Absent.">Mark Present</button>`
-          : `<button class="btn btn-sm btn-outline btn-mark-absent" data-regid="${reg.regId}">Mark Absent</button>`}
-      </td>`;
+      `<td>` +
+        `<div style="display:flex; gap: var(--space-xs); flex-wrap: wrap;">` +
+          `<button class="btn btn-sm ${isPresent ? "btn-ghost" : "btn-primary"} btn-mark-present" data-regid="${reg.regId}" ${isPresent ? "disabled" : ""}>${isPresent ? "Present ✓" : "Mark Present"}</button>` +
+          `<button class="btn btn-sm ${isAbsent ? "btn-ghost" : "btn-danger"} btn-mark-absent" data-regid="${reg.regId}" ${isAbsent ? "disabled" : ""}>${isAbsent ? "Absent ✗" : "Mark Absent"}</button>` +
+        `</div>` +
+      `</td>`;
     rosterTableBody.appendChild(tr);
   });
 
@@ -1048,6 +1084,7 @@ const bindEvents = () => {
   document.querySelectorAll('.nav-link[data-tab="scanner"]').forEach((link) => {
     link.addEventListener("click", () => {
       resolveRefs();
+      populateScannerEventSelect();
       renderLiveCheckinFeed();
     });
   });
@@ -1067,6 +1104,7 @@ const bindEvents = () => {
 // ─── Public API ───────────────────────────────────────────────────────────
 const init = () => {
   resolveRefs();
+  populateScannerEventSelect();
   bindEvents();
   if (!scannerRunning) {
     updateScannerUI(false);

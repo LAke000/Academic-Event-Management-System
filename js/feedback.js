@@ -178,7 +178,7 @@ const FeedbackModule = (() => {
     const catSelectors = ["fb-speaker-quality", "fb-content-relevance", "fb-venue-organization"];
     catSelectors.forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.value = "";
+      if (el) el.value = "5";
     });
     updateSubmitButton();
   };

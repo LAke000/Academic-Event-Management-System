@@ -197,6 +197,13 @@ const drawCertificate = (ctx, reg, event) => {
   ctx.lineTo(w - 130, 505);
   ctx.stroke();
 
+  // ── Organizer & Dean Signatures (drawn above the signature lines at y=555) ──
+  ctx.font = "italic bold 18px 'Georgia', 'Times New Roman', serif";
+  ctx.fillStyle = NAVY;
+  ctx.textAlign = "center";
+  ctx.fillText(event && event.speaker ? event.speaker : "Dr. A. Sharma", w / 4, 555);
+  ctx.fillText("Office of Academic Affairs", (3 * w) / 4, 555);
+
   // ── Signature placeholder lines (above labels at y=568) ──
   ctx.font = "14px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = "#475569";

@@ -707,12 +707,18 @@ input[type="radio"] {
   animation: slideIn var(--transition-base);
 }
 
-.scan-toast--warning {
+.scan-toast.scan-toast--success {
+  background-color: var(--status-present);
+}
+
+.scan-toast--warning,
+.scan-toast.scan-toast--warning {
   background-color: var(--status-pending);
   color: var(--color-text-inverse);
 }
 
-.scan-toast--error {
+.scan-toast--error,
+.scan-toast.scan-toast--error {
   background-color: var(--status-housefull);
   color: var(--color-text-inverse);
 }
