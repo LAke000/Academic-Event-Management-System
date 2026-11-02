@@ -95,8 +95,9 @@ const ensureDiscoverControls = () => {
   const needsType = !alreadyHas("type-filter-select");
   const needsAvail = !alreadyHas("avail-filter-select");
   const needsDate = !alreadyHas("date-filter-input");
+  const needsReset = !alreadyHas("btn-reset-filters");
 
-  if (!needsSearch && !needsDept && !needsType && !needsAvail && !needsDate)
+  if (!needsSearch && !needsDept && !needsType && !needsAvail && !needsDate && !needsReset)
     return;
 
   const bar = document.createElement("div");
@@ -161,6 +162,17 @@ const ensureDiscoverControls = () => {
     bar.appendChild(input);
   }
 
+  if (needsReset) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "btn-reset-filters";
+    btn.className = "btn btn-ghost btn-sm";
+    btn.textContent = "Reset Filters";
+    btn.style.cssText = "align-self: flex-end;";
+    btn.addEventListener("click", () => resetFilters());
+    bar.appendChild(btn);
+  }
+
   const parent = discoverContainer.parentElement;
   if (parent) {
     parent.insertBefore(bar, discoverContainer);
@@ -173,6 +185,16 @@ const ensureDiscoverControls = () => {
 // ─── Filter state ───────────────────────────────────────────────────────────
 
 let currentFilters = { query: "", department: "", type: "", availability: "", date: "" };
+
+const resetFilters = () => {
+  currentFilters = { query: "", department: "", type: "", availability: "", date: "" };
+  if (searchInput) searchInput.value = "";
+  if (deptFilter) deptFilter.value = "";
+  if (typeFilter) typeFilter.value = "";
+  if (availFilter) availFilter.value = "";
+  if (dateFilterInput) dateFilterInput.value = "";
+  renderDiscover();
+};
 
 const matchesSearch = (event, query) => {
   if (!query) return true;
@@ -292,7 +314,12 @@ const renderDiscover = () => {
       '<div class="empty-icon">&#128197;</div>' +
       '<h2>No Events Matching</h2>' +
       '<p>Try adjusting your search or filters.</p>' +
+      '<button class="btn btn-primary btn-sm" id="btn-reset-filters-empty" style="margin-top: var(--space-md);">Reset Filters</button>' +
       "</div>";
+    const emptyResetBtn = document.getElementById("btn-reset-filters-empty");
+    if (emptyResetBtn) {
+      emptyResetBtn.addEventListener("click", () => resetFilters());
+    }
     return;
   }
 
@@ -1047,8 +1074,10 @@ const init = () => {
 const EventsModule = {
   init,
   render,
+  renderDiscover,
   renderAdminTable,
   populateFilters,
+  resetFilters,
   openRegistrationModal,
   deleteEvent,
 };

@@ -57,22 +57,10 @@
     display: none !important;
   }
 
-  main.main-content {
-    margin-left: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    background-color: #ffffff !important;
-  }
-
-  section.tab-pane {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    page-break-inside: auto;
+  .app-layout,
+  main.main-content,
+  #toast-container {
+    display: none !important;
   }
 
   .pass-layout,

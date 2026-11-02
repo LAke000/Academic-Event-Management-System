@@ -94,11 +94,14 @@
 }
 
 .event-card-footer {
-  padding: var(--space-md);
+  margin-top: auto;
+  padding-top: var(--space-md);
   border-top: 1px solid var(--color-border);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .capacity-bar-wrap {
@@ -220,6 +223,8 @@
   border-top: 1px solid var(--color-border);
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 /* History list */
@@ -523,7 +528,7 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgb(2, 132, 199 / 0.15);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
 select {
@@ -610,10 +615,10 @@ input[type="radio"] {
 
 @keyframes scanPulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgb(2, 132, 199 / 0.4);
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 12px rgb(2, 132, 199 / 0);
+    box-shadow: 0 0 0 12px rgba(2, 132, 199, 0);
   }
 }
 
@@ -665,6 +670,9 @@ input[type="radio"] {
   padding: var(--space-md);
   background-color: var(--color-surface-secondary);
   border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 .scanner-manual h3 {
