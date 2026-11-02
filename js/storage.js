@@ -8,12 +8,24 @@ const EVENTS_KEY = "academic_events_db";
 const REGISTRATIONS_KEY = "academic_registrations_db";
 const FEEDBACK_KEY = "academic_feedback_db";
 const REMINDERS_KEY = "academic_reminders_db";
+const STUDENTS_KEY = "academic_students_db";
 const ROLE_KEY = "academic_active_role";
 const ACTIVE_STUDENT_KEY = "academic_active_student";
 const CLEARED_FLAG_KEY = "academic_db_cleared";
 
 const DEFAULT_ROLE = "student";
 const DEFAULT_ACTIVE_STUDENT_ID = "12601928";
+
+const DEFAULT_STUDENTS = [
+  { studentId: "12601928", name: "Alice Kumar", email: "alice.kumar@example.edu", department: "CSE" },
+  { studentId: "12601929", name: "Bob Singh", email: "bob.singh@example.edu", department: "CSE" },
+  { studentId: "12601930", name: "Carol Lee", email: "carol.lee@example.edu", department: "IT" },
+  { studentId: "12601931", name: "David Patel", email: "david.patel@example.edu", department: "IT" },
+  { studentId: "12601932", name: "Eva Martínez", email: "eva.martinez@example.edu", department: "ME" },
+  { studentId: "12601933", name: "Frank Zhao", email: "frank.zhao@example.edu", department: "ME" },
+  { studentId: "12601934", name: "Grace O'Neil", email: "grace.oneil@example.edu", department: "Polytechnic" },
+  { studentId: "12601935", name: "Hiro Tanaka", email: "hiro.tanaka@example.edu", department: "Polytechnic" },
+];
 
 class StorageService {
   // ------------------------------------------------------------------
@@ -264,6 +276,45 @@ class StorageService {
   }
 
   // ------------------------------------------------------------------
+  // Known Students
+  // ------------------------------------------------------------------
+
+  /**
+   * Returns all known university students, seeding DEFAULT_STUDENTS if empty.
+   * @returns {Array<{studentId: string, name: string, email: string, department: string}>}
+   */
+  static getKnownStudents() {
+    const list = this._read(STUDENTS_KEY, null);
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
+      return [...DEFAULT_STUDENTS];
+    }
+    return list;
+  }
+
+  /**
+   * Adds or updates a known student in the persistent roster.
+   * @param {object} student - { studentId, name, email, department }
+   * @returns {boolean}
+   */
+  static saveKnownStudent(student) {
+    if (!student || !student.studentId) return false;
+    const students = this.getKnownStudents();
+    const idx = students.findIndex((s) => s.studentId === student.studentId);
+    if (idx >= 0) {
+      students[idx] = { ...students[idx], ...student };
+    } else {
+      students.push({
+        studentId: student.studentId,
+        name: student.name || "",
+        email: student.email || "",
+        department: student.department || "",
+      });
+    }
+    return this._write(STUDENTS_KEY, students);
+  }
+
+  // ------------------------------------------------------------------
   // Reset
   // ------------------------------------------------------------------
 
@@ -277,6 +328,11 @@ class StorageService {
     const regsOk = this._write(REGISTRATIONS_KEY, []);
     const feedbackOk = this._write(FEEDBACK_KEY, []);
     const remindersOk = this._write(REMINDERS_KEY, []);
+    // Ensure known students database remains intact or refreshed to DEFAULT_STUDENTS
+    const students = this._read(STUDENTS_KEY, null);
+    if (!students || students.length === 0) {
+      this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
+    }
     try {
       localStorage.setItem(CLEARED_FLAG_KEY, "true");
     } catch (_err) {}
@@ -292,6 +348,7 @@ class StorageService {
     localStorage.removeItem(REGISTRATIONS_KEY);
     localStorage.removeItem(FEEDBACK_KEY);
     localStorage.removeItem(REMINDERS_KEY);
+    localStorage.removeItem(STUDENTS_KEY);
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(ACTIVE_STUDENT_KEY);
     try {
@@ -310,7 +367,18 @@ class StorageService {
    * @param {boolean} [force=false]
    */
   static seedDemoData(force = false) {
-    if (localStorage.getItem(CLEARED_FLAG_KEY) === "true" && !force) return;
+    if (localStorage.getItem(CLEARED_FLAG_KEY) === "true" && !force) {
+      if (!this._read(STUDENTS_KEY, null)) {
+        this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
+      }
+      return;
+    }
+
+    // Seed known students roster
+    if (!this._read(STUDENTS_KEY, null) || force) {
+      this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
+    }
+
     const existing = this.getEvents();
 
     // Auto-backfill legacy seeded demo records if loaded from an earlier session

@@ -278,8 +278,24 @@ const refreshStudentSwitcher = (role) => {
   const currentVal = StorageService.getActiveStudentId() || "ALL";
   switcher.innerHTML = '<option value="ALL">All Demo Students</option>';
   try {
+    const knownStudents = typeof StorageService.getKnownStudents === "function"
+      ? StorageService.getKnownStudents()
+      : [];
     const regs = StorageService.getRegistrations();
     const seen = new Set();
+
+    // 1. First add all known students so all profiles are always available
+    knownStudents.forEach((s) => {
+      if (s.studentId && !seen.has(s.studentId)) {
+        seen.add(s.studentId);
+        const opt = document.createElement("option");
+        opt.value = s.studentId;
+        opt.textContent = `${s.name || "Student"} (${s.studentId})`;
+        switcher.appendChild(opt);
+      }
+    });
+
+    // 2. Also add any dynamically registered students from registrations
     regs.forEach((r) => {
       if (r.studentId && !seen.has(r.studentId)) {
         seen.add(r.studentId);
@@ -289,6 +305,7 @@ const refreshStudentSwitcher = (role) => {
         switcher.appendChild(opt);
       }
     });
+
     const validVal =
       currentVal === "ALL" || seen.has(currentVal)
         ? currentVal
@@ -328,8 +345,13 @@ const updateProfileChip = (role) => {
       const studentRegs = regs.filter((r) => r.studentId === activeId);
       count = studentRegs.length;
       const firstReg = studentRegs[0] || regs.find((r) => r.studentId === activeId);
+      const known = typeof StorageService.getKnownStudents === "function"
+        ? StorageService.getKnownStudents().find((s) => s.studentId === activeId)
+        : null;
       if (firstReg && firstReg.name) {
         studentName = `${firstReg.name} (${activeId})`;
+      } else if (known && known.name) {
+        studentName = `${known.name} (${activeId})`;
       } else {
         studentName = `Student (${activeId})`;
       }
@@ -369,7 +391,7 @@ const refreshAllModules = (role) => {
   updateProfileChip(role);
 };
 
-const applyRole = (role) => {
+const applyRole = (role, targetTab = null) => {
   const isAdmin = role === "admin";
 
   const toggle = document.getElementById("role-toggle");
@@ -394,8 +416,8 @@ const applyRole = (role) => {
     console.error("[app] Failed to persist active role:", err);
   }
 
-  // Navigate to the default landing view for the selected role.
-  showTab(isAdmin ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
+  // Navigate to the target tab or default landing view for the selected role.
+  showTab(targetTab || (isAdmin ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT));
 };
 
 const bindRoleToggle = () => {
@@ -416,6 +438,13 @@ const bindRoleToggle = () => {
  */
 function showTab(tabId) {
   if (!tabId) return;
+
+  // Update hash to preserve tab on F5 refresh
+  try {
+    if (window.location.hash !== `#${tabId}`) {
+      window.location.hash = tabId;
+    }
+  } catch (_e) {}
 
   // Deactivate all nav links.
   document
@@ -476,6 +505,15 @@ const bindRouter = () => {
         showTab(tabId);
       });
     });
+
+  window.addEventListener("hashchange", () => {
+    const hash = window.location.hash ? window.location.hash.replace(/^#/, "") : "";
+    if (hash && document.getElementById(hash)) {
+      const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      if (ADMIN_TABS.includes(hash) && role !== "admin") return;
+      showTab(hash);
+    }
+  });
 };
 
 // ─── Dashboard stats (rendered locally; no dedicated module) ───────────────
@@ -816,7 +854,13 @@ const boot = () => {
   }
 
   const role = StorageService.getActiveRole() || DEFAULT_ROLE;
-  applyRole(role);
+
+  // Activate tab from window.location.hash if valid so F5 refresh preserves active page
+  const hash = window.location.hash ? window.location.hash.replace(/^#/, "") : "";
+  const validHashTab = hash && document.getElementById(hash) && document.querySelector(`#sidebar-nav .nav-link[data-tab="${hash}"]`);
+  const initialTab = validHashTab && !(ADMIN_TABS.includes(hash) && role !== "admin") ? hash : null;
+
+  applyRole(role, initialTab);
   bindRoleToggle();
   bindRouter();
   bindDataButtons();

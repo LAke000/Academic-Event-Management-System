@@ -43,6 +43,7 @@ const REGISTRATION_MARKUP = `
         <input type="text" id="reg-department" name="department" required placeholder="e.g. CSE" maxlength="80">
       </div>
       <footer class="dialog-footer">
+        <button type="button" class="btn btn-outline btn-sm" id="reg-fill-active-btn">Use Active Profile</button>
         <button type="button" class="btn btn-outline btn-sm" id="reg-clear-btn">Clear / New Student</button>
         <button type="button" class="btn btn-ghost" id="reg-cancel-btn">Cancel</button>
         <button type="submit" class="btn btn-primary">Register</button>
@@ -278,6 +279,18 @@ const handleRegistrationSubmit = (event) => {
     showRegFormError("Failed to save registration. Storage may be full.");
     return;
   }
+
+  // Save new student to known students roster
+  try {
+    if (typeof StorageService.saveKnownStudent === "function") {
+      StorageService.saveKnownStudent({
+        studentId,
+        name,
+        email,
+        department,
+      });
+    }
+  } catch (_err) {}
 
   // Keep event registration count in sync so capacity badges stay accurate.
   const allEvents = StorageService.getEvents();
@@ -747,6 +760,36 @@ const bindEvents = () => {
       const curEventId = fieldEventId ? fieldEventId.value : "";
       if (form) form.reset();
       if (fieldEventId && curEventId) fieldEventId.value = curEventId;
+    });
+  }
+  const fillActiveBtn = document.getElementById("reg-fill-active-btn");
+  if (fillActiveBtn) {
+    fillActiveBtn.addEventListener("click", () => {
+      clearRegFormError();
+      const activeStudentId = StorageService.getActiveStudentId();
+      if (!activeStudentId || activeStudentId === "ALL") {
+        if (typeof window.showToast === "function") {
+          window.showToast("Select a specific student profile from the top switcher first.", "info");
+        }
+        return;
+      }
+      const known = typeof StorageService.getKnownStudents === "function"
+        ? StorageService.getKnownStudents().find((s) => s.studentId === activeStudentId)
+        : null;
+      const reg = StorageService.getRegistrations().find((r) => r.studentId === activeStudentId);
+
+      const studentName = (known && known.name) || (reg && reg.name) || "";
+      const email = (known && known.email) || (reg && reg.email) || "";
+      const dept = (known && known.department) || (reg && reg.department) || "";
+
+      if (fieldName) fieldName.value = studentName;
+      if (fieldStudentId) fieldStudentId.value = activeStudentId;
+      if (fieldEmail) fieldEmail.value = email;
+      if (fieldDepartment) fieldDepartment.value = dept;
+
+      if (typeof window.showToast === "function") {
+        window.showToast(`Prefilled profile for ${studentName || activeStudentId}.`, "info");
+      }
     });
   }
   if (dialogEl) {
