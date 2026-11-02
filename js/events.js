@@ -65,6 +65,35 @@ const escapeHtml = (str) => {
   return div.innerHTML;
 };
 
+const computeEventLifecycle = (event, registeredCount) => {
+  const now = new Date();
+  const capacity = Number(event.capacity) || 0;
+  const start = event.date ? new Date(event.date) : null;
+  const end = event.endTime
+    ? new Date(event.endTime)
+    : start
+    ? new Date(start.getTime() + 2 * 60 * 60 * 1000)
+    : null;
+  const deadline = event.deadline ? new Date(event.deadline) : start;
+
+  if (event.status === "Cancelled") {
+    return { label: "Cancelled", cls: "bg-danger", isClosed: true, reason: "Event Cancelled" };
+  }
+  if (end && now > end) {
+    return { label: "Completed", cls: "bg-secondary", isClosed: true, reason: "Event Completed" };
+  }
+  if (start && end && now >= start && now <= end) {
+    return { label: "Ongoing", cls: "bg-warning", isClosed: true, reason: "Event Ongoing" };
+  }
+  if (capacity > 0 && registeredCount >= capacity) {
+    return { label: "Full (Housefull)", cls: "bg-danger", isClosed: true, reason: "Event Full" };
+  }
+  if (deadline && now > deadline) {
+    return { label: "Registration Closed", cls: "bg-warning", isClosed: true, reason: "Registration Closed" };
+  }
+  return { label: "Upcoming", cls: "bg-success", isClosed: false, reason: "" };
+};
+
 const badgeFor = (registeredCount, capacity, isPastDeadline = false) => {
   if (registeredCount >= capacity) return { label: "Housefull", cls: "bg-danger" };
   if (isPastDeadline) return { label: "Registration Closed", cls: "bg-warning" };
@@ -326,14 +355,11 @@ const renderDiscover = () => {
   filtered.forEach((event) => {
     const registrations = StorageService.getRegistrationsByEvent(event.id);
     const registeredCount = registrations.length;
-    const capacity = event.capacity || 0;
+    const capacity = Number(event.capacity) || 0;
     const fillPercent =
       capacity > 0 ? Math.round((registeredCount / capacity) * 100) : 0;
-    const isFull = registeredCount >= capacity;
-    const isPastDeadline =
-      event.deadline && new Date() > new Date(event.deadline);
-    const isClosed = isFull || isPastDeadline;
-    const badge = badgeFor(registeredCount, capacity, isPastDeadline);
+    const lifecycle = computeEventLifecycle(event, registeredCount);
+    const isClosed = lifecycle.isClosed;
 
     // Check if the active student is already registered for this event.
     const activeStudentId = StorageService.getActiveStudentId();
@@ -382,11 +408,11 @@ const renderDiscover = () => {
           ${event.description ? `<div class="meta-row description-row"><span class="meta-icon">📝</span><span><strong>Description:</strong> ${escapeHtml(event.description)}</span></div>` : ""}
         </div>
         <div class="capacity-bar-wrap">
-          <div class="capacity-bar" style="width: ${Math.min(fillPercent, 100)}%; background: ${isFull ? "var(--status-housefull)" : fillPercent >= 80 ? "var(--status-pending)" : "var(--status-open)"};"></div>
+          <div class="capacity-bar" style="width: ${Math.min(fillPercent, 100)}%; background: ${lifecycle.label.startsWith("Full") || lifecycle.label === "Cancelled" ? "var(--status-housefull)" : fillPercent >= 80 ? "var(--status-pending)" : "var(--status-open)"};"></div>
         </div>
         <div class="capacity-text">
-          <span>${registeredCount}/${capacity} seats</span>
-          <span>${escapeHtml(badge.label)}</span>
+          <span><strong>Available:</strong> ${Math.max(0, capacity - registeredCount)} / ${capacity} seats (${registeredCount} registered)</span>
+          <span class="status-badge ${lifecycle.cls}">${escapeHtml(lifecycle.label)}</span>
         </div>
         <div class="event-card-footer" style="display:flex; gap: var(--space-xs); flex-wrap: wrap; align-items: center;">
           ${alreadyRegistered
@@ -399,9 +425,7 @@ const renderDiscover = () => {
           }
           <button class="btn ${alreadyRegistered ? "btn-outline btn-sm" : "btn-primary"} btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
             ${isClosed
-              ? isPastDeadline
-                ? "Registration Closed"
-                : "Event Full"
+              ? (lifecycle.reason || "Closed")
               : alreadyRegistered
               ? "Register Another Student"
               : "Register Now"}
@@ -549,15 +573,8 @@ const renderAdminTable = () => {
   events.forEach((ev) => {
     const registrations = StorageService.getRegistrationsByEvent(ev.id);
     const registeredCount = registrations.length;
-    const capacity = ev.capacity || 0;
-    const fillPercent =
-      capacity > 0 ? Math.round((registeredCount / capacity) * 100) : 0;
-
-    // Compute live status from registration count, capacity, and deadline
-    const isFull = registeredCount >= capacity;
-    const isPastDeadline = ev.deadline && new Date() > new Date(ev.deadline);
-    const liveStatus = isFull ? "Housefull" : isPastDeadline ? "Closed" : "Open";
-    const badgeCls = isFull ? "bg-danger" : isPastDeadline ? "bg-warning" : "bg-success";
+    const capacity = Number(ev.capacity) || 0;
+    const lifecycle = computeEventLifecycle(ev, registeredCount);
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -568,9 +585,10 @@ const renderAdminTable = () => {
       <td>${new Date(ev.date).toLocaleString()}</td>
       <td>${capacity}</td>
       <td>${registeredCount}</td>
-      <td><span class="badge ${badgeCls}">${escapeHtml(liveStatus)}</span></td>
+      <td><span class="badge ${lifecycle.cls}">${escapeHtml(lifecycle.label)}</span></td>
       <td>
         <button class="btn btn-sm btn-outline btn-edit-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Edit</button>
+        <button class="btn btn-sm btn-outline btn-cancel-ev" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);" ${ev.status === "Cancelled" ? "disabled" : ""}>Cancel</button>
         <button class="btn btn-sm btn-ghost btn-view-roster" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Roster</button>
         <button class="btn btn-sm btn-ghost btn-remind-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Remind</button>
         <button class="btn btn-sm btn-danger btn-delete" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Delete</button>
@@ -583,6 +601,12 @@ const renderAdminTable = () => {
   adminTableBody.querySelectorAll(".btn-delete").forEach((btn) => {
     btn.addEventListener("click", () => {
       deleteEvent(btn.dataset.id);
+    });
+  });
+
+  adminTableBody.querySelectorAll(".btn-cancel-ev").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      cancelEvent(btn.dataset.id);
     });
   });
 
@@ -614,6 +638,43 @@ const renderAdminTable = () => {
 
   // Render the organizer reminder log beneath the events table
   renderAdminReminderLog();
+};
+
+// ─── Event cancellation ───────────────────────────────────────────────────
+
+const cancelEvent = (eventId) => {
+  if (!confirm(`Cancel event ${eventId}? This will mark it as cancelled for all attendees.`)) return;
+
+  const events = StorageService.getEvents().map((ev) => {
+    if (ev.id === eventId) {
+      return { ...ev, status: "Cancelled" };
+    }
+    return ev;
+  });
+  StorageService.saveEvents(events);
+
+  const regs = StorageService.getRegistrations().map((r) => {
+    if (r.eventId === eventId) {
+      return {
+        ...r,
+        status: "Cancelled",
+        attendance: { ...(r.attendance || {}), status: "Cancelled" },
+      };
+    }
+    return r;
+  });
+  StorageService.saveRegistrations(regs);
+
+  renderDiscover();
+  renderAdminTable();
+  if (typeof window.app?.refreshAllModules === "function") {
+    window.app.refreshAllModules(StorageService.getActiveRole() || "admin");
+  } else {
+    window.app?.renderDashboardStats?.();
+  }
+  if (typeof window.showToast === "function") {
+    window.showToast("Event cancelled successfully", "success");
+  }
 };
 
 // ─── Event deletion ────────────────────────────────────────────────────────
@@ -761,6 +822,28 @@ const renderAdminReminderLog = () => {
   logEl.appendChild(ul);
 };
 
+// ─── Inline Form Error Banner Helpers ─────────────────────────────────────
+
+const showEventFormError = (msg) => {
+  const errEl = document.getElementById("event-form-error");
+  if (errEl) {
+    errEl.textContent = msg;
+    errEl.hidden = false;
+    errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  if (typeof window.showToast === "function") {
+    window.showToast(msg, "error");
+  }
+};
+
+const clearEventFormError = () => {
+  const errEl = document.getElementById("event-form-error");
+  if (errEl) {
+    errEl.textContent = "";
+    errEl.hidden = true;
+  }
+};
+
 // ─── Event creation modal ─────────────────────────────────────────────────
 
 const initCreateEventModal = () => {
@@ -816,6 +899,7 @@ const initCreateEventModal = () => {
   // Form submission
   createForm.addEventListener("submit", (e) => {
     e.preventDefault();
+    clearEventFormError();
 
     const title = formFields.title ? formFields.title.value.trim() : "";
     const department = formFields.department
@@ -827,62 +911,70 @@ const initCreateEventModal = () => {
     const description = formFields.description
       ? formFields.description.value.trim()
       : "";
-    const capacity = formFields.capacity
-      ? parseInt(formFields.capacity.value, 10)
-      : NaN;
+    const capacityRaw = formFields.capacity
+      ? formFields.capacity.value.trim()
+      : "";
+    const capNum = Number(capacityRaw);
     const speaker = formFields.speaker ? formFields.speaker.value.trim() : "";
     const type = formFields.type ? formFields.type.value : "";
     const deadline = formFields.deadline ? formFields.deadline.value : "";
 
     // Validation
     if (!title || !department || !venue || !speaker) {
-      window.showToast(
-        "Validation Error: Title, Department, Venue, and Speaker are required.",
-        "error"
+      showEventFormError(
+        "Validation Error: Title, Department, Venue, and Speaker are required."
       );
       return;
     }
 
     if (!dateTime || Number.isNaN(new Date(dateTime).getTime())) {
-      window.showToast(
-        "Validation Error: Please enter a valid Event Date & Time.",
-        "error"
+      showEventFormError(
+        "Validation Error: Please enter a valid Event Date & Time."
       );
       return;
     }
 
-    if (Number.isNaN(capacity) || capacity < 1) {
-      window.showToast(
-        "Validation Error: Seat capacity must be at least 1.",
-        "error"
-      );
+    if (capacityRaw === "" || isNaN(capNum) || capNum < 1 || !Number.isInteger(capNum)) {
+      showEventFormError("Capacity must be a positive whole number (at least 1 seat).");
       return;
     }
+    const capacity = capNum;
 
     // Past date check: new events cannot be scheduled in the past
     if (!editingEventId && new Date(dateTime) < new Date()) {
-      window.showToast(
-        "Validation Error: Event date cannot be in the past.",
-        "error"
-      );
+      showEventFormError("Event date and time must be in the future.");
       return;
+    }
+
+    // Editing past date check: if date was changed on existing event, ensure it's not set into the past
+    if (editingEventId) {
+      const existingEv = StorageService.getEvents().find((e) => e.id === editingEventId);
+      if (
+        existingEv &&
+        new Date(existingEv.date).getTime() !== new Date(dateTime).getTime() &&
+        new Date(dateTime) < new Date()
+      ) {
+        showEventFormError("Event date and time must be in the future.");
+        return;
+      }
     }
 
     // End time check: end time must be after start time
     if (endTime && new Date(endTime) <= new Date(dateTime)) {
-      window.showToast(
-        "Validation Error: End Date & Time must be after the Start Date & Time.",
-        "error"
-      );
+      showEventFormError("End time must be after the event start time.");
       return;
     }
 
-    // Deadline check: registration deadline must be on or before the event start date
-    if (!deadline || new Date(deadline) > new Date(dateTime)) {
-      window.showToast(
-        "Validation Error: Registration deadline must be on or before the event start date.",
-        "error"
-      );
+    // Deadline check:
+    // If creating a new event, deadline cannot be in the past
+    if (!editingEventId && deadline && new Date(deadline) < new Date()) {
+      showEventFormError("Registration deadline cannot be in the past.");
+      return;
+    }
+
+    // Deadline must be on or before the event start time
+    if (deadline && new Date(deadline) > new Date(dateTime)) {
+      showEventFormError("Registration deadline must be before or equal to the event start time.");
       return;
     }
 
@@ -900,9 +992,8 @@ const initCreateEventModal = () => {
 
     // Validation: when editing, capacity cannot drop below current registrations.
     if (editingEventId && capacity < currentRegCount) {
-      window.showToast(
-        "Capacity cannot be less than current registrations (" + currentRegCount + ").",
-        "error"
+      showEventFormError(
+        "Capacity cannot be less than current registrations (" + currentRegCount + ")."
       );
       return;
     }
@@ -921,7 +1012,9 @@ const initCreateEventModal = () => {
       deadline: deadline ? new Date(deadline).toISOString() : "",
       capacity,
       registered: currentRegCount,
-      status: isFull ? "Housefull" : "Open",
+      status: editingEventId
+        ? (StorageService.getEventById(editingEventId)?.status === "Cancelled" ? "Cancelled" : isFull ? "Housefull" : "Open")
+        : (isFull ? "Housefull" : "Open"),
       speaker,
       description,
     };
@@ -931,7 +1024,7 @@ const initCreateEventModal = () => {
       // Update existing event in place, preserving its id and registered count
       const idx = events.findIndex((ev) => ev.id === editingEventId);
       if (idx === -1) {
-        window.showToast("Event to update not found.", "error");
+        showEventFormError("Event to update not found.");
         return;
       }
       events[idx] = updatedEvent;
@@ -942,9 +1035,8 @@ const initCreateEventModal = () => {
     }
 
     if (!saved) {
-      window.showToast(
-        "Failed to save event. Storage may be full.",
-        "error"
+      showEventFormError(
+        "Failed to save event. Storage may be full."
       );
       return;
     }
@@ -985,6 +1077,7 @@ const openEditEventDialog = (eventId) => {
   }
 
   editingEventId = eventId;
+  clearEventFormError();
 
   // Pre-fill form fields
   if (formFields.title) formFields.title.value = event.title;
@@ -1023,6 +1116,7 @@ const openEditEventDialog = (eventId) => {
  */
 const resetCreateDialog = () => {
   editingEventId = null;
+  clearEventFormError();
   if (createForm) createForm.reset();
 
   const dialogTitle = createDialog.querySelector(".dialog-header h2");
@@ -1084,6 +1178,7 @@ const EventsModule = {
   resetFilters,
   openRegistrationModal,
   deleteEvent,
+  cancelEvent,
 };
 
 export default EventsModule;
