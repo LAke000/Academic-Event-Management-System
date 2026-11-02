@@ -148,6 +148,7 @@ class StorageService {
 
     regs[idx].status = status;
     regs[idx].checkInTime = checkInTime ?? null;
+    regs[idx].attendance = { status, checkInTime: checkInTime ?? null };
     this.saveRegistrations(regs);
     return regs[idx];
   }

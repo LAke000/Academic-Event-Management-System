@@ -606,12 +606,16 @@ const renderHistory = () => {
 
   regs.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
-    const isPresent = reg.status === "Present";
+    // Dual-state consistency: respect both top-level and nested attendance status
+    const isPresent =
+      reg.status === "Present" ||
+      (reg.attendance && reg.attendance.status === "Present");
+    const checkInTimestamp = reg.checkInTime || reg.attendance?.checkInTime;
     const item = document.createElement("div");
     item.className = "history-item card";
 
     const headerDate = isPresent
-      ? formatDate(reg.checkInTime)
+      ? formatDate(checkInTimestamp)
       : (event ? formatDate(event.date) : "—");
 
     const statusBadge = isPresent
