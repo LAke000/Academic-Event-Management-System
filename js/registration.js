@@ -126,9 +126,17 @@ const openRegistrationModal = (eventId) => {
   form.reset();
 
   // Pre-fill form fields from the active student profile when it matches an
-  // existing student record (still allowing the user to type different details).
+  // existing student record (still allowing the user to type different details),
+  // but do NOT prefill if the active student is already registered for this event
+  // (e.g. when clicking "Register Another Student").
   const activeStudentId = StorageService.getActiveStudentId();
-  if (activeStudentId && activeStudentId !== "ALL") {
+  const eventRegs = StorageService.getRegistrationsByEvent(eventId);
+  const activeAlreadyInEvent =
+    activeStudentId &&
+    activeStudentId !== "ALL" &&
+    eventRegs.some((r) => r.studentId === activeStudentId);
+
+  if (activeStudentId && activeStudentId !== "ALL" && !activeAlreadyInEvent) {
     const regs = StorageService.getRegistrations();
     const existing = regs.find((r) => r.studentId === activeStudentId);
     if (existing) {
@@ -495,7 +503,10 @@ const renderPasses = () => {
  */
 const downloadIcsReminder = (event) => {
   const start = new Date(event.date);
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // default 2-hour duration
+  const end =
+    event.endTime && !Number.isNaN(new Date(event.endTime).getTime())
+      ? new Date(event.endTime)
+      : new Date(start.getTime() + 2 * 60 * 60 * 1000);
   const formatIcs = (d) =>
     d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 
@@ -516,7 +527,7 @@ const downloadIcsReminder = (event) => {
     `DTSTART:${dtstart}`,
     `DTEND:${dtend}`,
     `SUMMARY:${event.title}`,
-    `DESCRIPTION:${event.title + " — " + (event.department || "")}`,
+    `DESCRIPTION:${event.title + " — " + (event.department || "") + (event.description ? " | " + event.description : "")}`,
     `LOCATION:${event.venue || "—"}`,
     "BEGIN:VALARM",
     "ACTION:DISPLAY",

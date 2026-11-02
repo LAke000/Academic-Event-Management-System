@@ -139,58 +139,39 @@
 }
 
 .status-badge.open,
-.status-badge--open,
-.badge--success,
-.badge.bg-success,
-.badge.bg-primary {
-  background-color: var(--status-open-bg);
-  color: var(--status-open);
-}
-
-.status-badge.housefull,
-.status-badge--housefull,
-.badge.bg-danger {
-  background-color: var(--status-housefull-bg);
-  color: var(--status-housefull);
-}
-
-.status-badge.registered,
-.status-badge--registered,
-.badge--pending {
-  background-color: var(--status-registered-bg);
-  color: var(--status-registered);
-}
-
 .status-badge.present,
 .status-badge--present,
-.badge--present {
+.pass-badge.present,
+.badge--success,
+.badge.bg-success {
   background-color: var(--status-present-bg);
   color: var(--status-present);
 }
 
+.status-badge.housefull,
 .status-badge.absent,
 .status-badge--absent,
-.badge--absent {
+.pass-badge.absent,
+.badge--absent,
+.badge.bg-danger {
   background-color: var(--status-absent-bg);
   color: var(--status-absent);
 }
 
+.status-badge.registered,
+.status-badge--registered,
+.pass-badge.registered,
+.badge--pending,
+.badge.bg-primary {
+  background-color: var(--status-registered-bg);
+  color: var(--status-registered);
+}
+
 .status-badge.pending,
-.status-badge--pending,
+.badge--warning,
 .badge.bg-warning {
   background-color: var(--status-pending-bg);
   color: var(--status-pending);
-}
-
-/* Badge fill variants (admin table status chips) */
-.badge.bg-danger {
-  background-color: var(--status-housefull-bg);
-  color: var(--status-housefull);
-}
-
-.badge.bg-success {
-  background-color: var(--status-open-bg);
-  color: var(--status-open);
 }
 
 /* Passes grid */

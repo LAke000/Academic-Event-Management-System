@@ -377,6 +377,24 @@ const FeedbackModule = (() => {
       }
     });
 
+    // Compute categorical averages when present
+    const catReviews = eventFeedback.filter(
+      (f) => f.speakerQuality || f.contentRelevance || f.venueOrganization
+    );
+    const countCat = catReviews.length;
+    const avgSpeaker =
+      countCat > 0
+        ? (catReviews.reduce((sum, f) => sum + Number(f.speakerQuality || 0), 0) / countCat).toFixed(1)
+        : null;
+    const avgContent =
+      countCat > 0
+        ? (catReviews.reduce((sum, f) => sum + Number(f.contentRelevance || 0), 0) / countCat).toFixed(1)
+        : null;
+    const avgVenue =
+      countCat > 0
+        ? (catReviews.reduce((sum, f) => sum + Number(f.venueOrganization || 0), 0) / countCat).toFixed(1)
+        : null;
+
     // ── Summary scorecards ──
     const summarySection = document.createElement("div");
     summarySection.className = "feedback-summary";
@@ -391,6 +409,24 @@ const FeedbackModule = (() => {
           `<span class="stat-value">${totalReviews}</span>` +
           `<span class="stat-label">Total Reviews</span>` +
         `</div>` +
+        (avgSpeaker !== null
+          ? `<div class="stat-card">` +
+              `<span class="stat-value">${avgSpeaker}</span>` +
+              `<span class="stat-label">Speaker Quality</span>` +
+            `</div>`
+          : "") +
+        (avgContent !== null
+          ? `<div class="stat-card">` +
+              `<span class="stat-value">${avgContent}</span>` +
+              `<span class="stat-label">Content Relevance</span>` +
+            `</div>`
+          : "") +
+        (avgVenue !== null
+          ? `<div class="stat-card">` +
+              `<span class="stat-value">${avgVenue}</span>` +
+              `<span class="stat-label">Venue / Org</span>` +
+            `</div>`
+          : "") +
       `</div>` +
       `<div class="rating-distribution">` +
         `<h3>Rating Breakdown</h3>` +

@@ -5,7 +5,7 @@
 // preserved end-to-end.
 
 import StorageService from "./storage.js";
-import { generateId } from "./utils.js";
+import { generateId, formatDate } from "./utils.js";
 
 // ─── Cached DOM references (resolved lazily to survive late injection) ──────
 let discoverContainer = null;
@@ -268,18 +268,20 @@ const renderDiscover = () => {
   );
 
   if (bannerEl) {
-    let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
     if (upcomingReminders.length === 0) {
-      bannerHtml += `<p style="margin:0; font-size: var(--font-sm); color: var(--color-text-muted);">No upcoming reminders.</p>`;
+      bannerEl.hidden = true;
+      bannerEl.innerHTML = "";
     } else {
+      bannerEl.hidden = false;
+      let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
       bannerHtml += `<ul style="margin:0; padding-left: var(--space-md); font-size: var(--font-sm);">`;
       upcomingReminders.forEach((rem) => {
         const event = StorageService.getEventById(rem.eventId);
         bannerHtml += `<li style="margin-bottom: var(--space-xs);">${escapeHtml(rem.message || "")} ${event ? `— ${escapeHtml(event.title)}` : ""}</li>`;
       });
       bannerHtml += `</ul>`;
+      bannerEl.innerHTML = bannerHtml;
     }
-    bannerEl.innerHTML = bannerHtml;
   }
 
   discoverContainer.innerHTML = "";
@@ -510,6 +512,8 @@ const renderAdminTable = () => {
   if (events.length === 0) {
     if (eventsEmpty) eventsEmpty.hidden = false;
     if (eventsList) eventsList.hidden = true;
+    const logEl = document.getElementById("reminder-log");
+    if (logEl) logEl.hidden = true;
     return;
   }
   if (eventsEmpty) eventsEmpty.hidden = true;
@@ -698,6 +702,7 @@ const renderAdminReminderLog = () => {
   const reminders = StorageService.getReminders();
   const entries = reminders.slice().reverse(); // newest first
 
+  logEl.hidden = false;
   logEl.innerHTML = "";
   const heading = document.createElement("h3");
   heading.textContent = "Reminder Log";
@@ -719,7 +724,7 @@ const renderAdminReminderLog = () => {
     const li = document.createElement("li");
     li.style.cssText = "margin-bottom: var(--space-xs); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-xs);";
     li.innerHTML = `
-      <div style="font-size: var(--font-xs); color: var(--color-text-muted);">${escapeHtml(rem.sentAt || "")}</div>
+      <div style="font-size: var(--font-xs); color: var(--color-text-muted);">${escapeHtml(rem.sentAt ? formatDate(rem.sentAt) : "—")}</div>
       <div style="margin-top: var(--space-xs);">${escapeHtml(rem.message || "")}</div>
       ${event ? `<div style="font-size: var(--font-xs); color: var(--color-text-secondary); margin-top: var(--space-xs);">Event: ${escapeHtml(event.title)}</div>` : ""}
       <div style="font-size: var(--font-xs); color: var(--color-text-secondary); margin-top: var(--space-xs);">Sent to ${rem.sentToCount ?? 0} attendee(s).</div>
