@@ -329,11 +329,11 @@ const printCertificate = () => {
     `img{width:${CANVAS_WIDTH}px;height:${CANVAS_HEIGHT}px;max-width:100%;max-height:100vh;}` +
     `@media print{body{background:#fff;margin:0;}img{width:${CANVAS_WIDTH}px;height:${CANVAS_HEIGHT}px;}}` +
     `</style>` +
-    `</head><body><img src="${dataUrl}" alt="Certificate of Participation"></body></html>`
+    `</head><body><img src="${dataUrl}" alt="Certificate of Participation">` +
+    `<script>window.onload = function() { setTimeout(function() { window.focus(); window.print(); }, 150); };<\/script>` +
+    `</body></html>`
   );
   printWin.document.close();
-  printWin.focus();
-  printWin.print();
 };
 
 // ─── Event binding ────────────────────────────────────────────────────────

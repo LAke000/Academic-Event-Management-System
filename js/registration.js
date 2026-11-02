@@ -436,8 +436,9 @@ const renderPassCard = (reg) => {
         ? `<button class="btn btn-ghost btn-sm" disabled style="color: var(--status-housefull);">Event Cancelled (Void)</button>`
         : isPresent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>
-           <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
-           <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>`
+           <button class="btn btn-outline btn-sm btn-download-cert" data-regid="${escapeHtml(reg.regId)}">Download Certificate</button>
+           <button class="btn btn-outline btn-sm btn-submit-feedback" data-regid="${escapeHtml(reg.regId)}" data-eventid="${escapeHtml(reg.eventId)}" data-studentid="${escapeHtml(reg.studentId)}">Submit Feedback</button>
+           <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>`
         : isAbsent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Marked Absent — Certificate & Feedback Locked">Marked Absent (Locked)</button>
            <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
@@ -538,6 +539,33 @@ const renderPasses = () => {
     btn.addEventListener("click", () => {
       const event = StorageService.getEventById(btn.dataset.id);
       if (event) downloadIcsReminder(event);
+    });
+  });
+
+  passesList.querySelectorAll(".btn-download-cert").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const regId = btn.dataset.regid;
+      if (typeof window.CertificateModule?.generateCertificate === "function") {
+        window.CertificateModule.generateCertificate(regId);
+      } else if (typeof CertificateModule?.generateCertificate === "function") {
+        CertificateModule.generateCertificate(regId);
+      } else {
+        window.showToast("Certificate module unavailable.", "error");
+      }
+    });
+  });
+
+  passesList.querySelectorAll(".btn-submit-feedback").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const eventId = btn.dataset.eventid;
+      const studentId = btn.dataset.studentid;
+      if (typeof window.FeedbackModule?.openFeedbackDialog === "function") {
+        window.FeedbackModule.openFeedbackDialog(eventId, studentId);
+      } else if (typeof FeedbackModule?.openFeedbackDialog === "function") {
+        FeedbackModule.openFeedbackDialog(eventId, studentId);
+      } else {
+        window.showToast("Feedback module unavailable.", "error");
+      }
     });
   });
 };
