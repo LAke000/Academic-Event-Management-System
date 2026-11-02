@@ -679,9 +679,9 @@ const renderHistory = () => {
     const event = StorageService.getEventById(reg.eventId);
     // Dual-state consistency: respect both top-level and nested attendance status
     const isCancelled =
-      event?.status === "Cancelled" ||
       reg.status === "Cancelled" ||
-      (reg.attendance && reg.attendance.status === "Cancelled");
+      reg.attendance?.status === "Cancelled" ||
+      (event && event.status === "Cancelled");
     const isPresent =
       !isCancelled &&
       (reg.status === "Present" ||
@@ -728,9 +728,7 @@ const renderHistory = () => {
     if (isCancelled) {
       actionsHtml =
         `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center;">` +
-        `<p class="history-item-note" style="margin:0; font-size: var(--font-xs); color: var(--color-danger, #dc2626); font-weight: 500;">
-          Event Cancelled — Attendance, Feedback, and Certificate are closed.
-        </p>` +
+        `<p class="history-item-note" style="margin:0; font-size: var(--font-xs); color: var(--color-danger, #dc2626); font-weight: 500;">Event Cancelled — Attendance, Feedback, and Certificate are closed.</p>` +
         `</div>`;
     } else if (isPresent) {
       const feedbackSubmitted = hasFeedback(reg);

@@ -433,8 +433,7 @@ const renderPassCard = (reg) => {
     </div>
     <div class="pass-card-actions">
       ${isCancelled
-        ? `<button class="btn btn-ghost btn-sm" disabled style="color: var(--status-housefull);" title="This event has been cancelled.">Event Cancelled (Void)</button>
-           <button class="btn btn-outline btn-sm btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View Pass (Void)</button>`
+        ? `<button class="btn btn-ghost btn-sm" disabled style="color: var(--status-housefull);">Event Cancelled (Void)</button>`
         : isPresent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>
            <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
