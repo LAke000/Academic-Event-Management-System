@@ -255,6 +255,9 @@ const FeedbackModule = (() => {
     // Refresh admin dashboard if visible
     renderAdminDashboard();
 
+    // Refresh reports charts so feedback analytics stay in sync
+    window.ReportsModule?.renderCharts?.();
+
     // Refresh student history & dashboard stats so new feedback is reflected
     if (typeof window.app?.renderHistory === "function") {
       window.app.renderHistory();
@@ -453,12 +456,16 @@ const FeedbackModule = (() => {
     }
     starsHtml += "</span>";
 
+    // Look up event title for context (especially in "All Events" view)
+    const event = StorageService.getEventById(fb.eventId);
+    const eventTitle = event ? event.title : fb.eventId;
+
     card.innerHTML =
       `<div class="review-card-header">` +
         `<span class="review-student">${escapeHtml(studentName)}</span>` +
         starsHtml +
       `</div>` +
-      `<p class="review-date">${formatDate(fb.timestamp)}</p>` +
+      `<p class="review-date">${escapeHtml(eventTitle)} · ${formatDate(fb.timestamp)}</p>` +
       `${fb.comment
         ? `<p class="review-comment">${escapeHtml(fb.comment)}</p>`
         : '<p class="review-comment review-comment--empty">No written comments.</p>'

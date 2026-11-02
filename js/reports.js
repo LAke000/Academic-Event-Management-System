@@ -134,6 +134,8 @@ const renderAnalytics = () => {
   // Placed at the start of .report-actions so the admin can scope exports
   // to a single event or leave it on "All Events" for a full dump.
   const reportActions = document.querySelector(".report-actions");
+  if (reportActions) reportActions.hidden = !hasEvents;
+
   let reportEventFilter = document.getElementById("reports-event-filter");
   if (reportActions && !reportEventFilter) {
     reportEventFilter = document.createElement("select");
@@ -144,6 +146,8 @@ const renderAnalytics = () => {
     reportActions.insertBefore(reportEventFilter, reportActions.firstChild);
   }
   if (reportEventFilter) {
+    // Preserve the current selection across re-renders
+    const prevSelected = reportEventFilter.value;
     reportEventFilter.innerHTML = '<option value="">All Events</option>';
     events.forEach((ev) => {
       const opt = document.createElement("option");
@@ -151,6 +155,10 @@ const renderAnalytics = () => {
       opt.textContent = ev.title || ev.id;
       reportEventFilter.appendChild(opt);
     });
+    // Restore previous selection if it still exists
+    if (prevSelected && events.some((e) => e.id === prevSelected)) {
+      reportEventFilter.value = prevSelected;
+    }
   }
 
   // No events: destroy any stale chart instances and bail out so empty
@@ -299,9 +307,16 @@ const exportRegistrationsCSV = (eventId) => {
   const regs = eventId
     ? StorageService.getRegistrationsByEvent(eventId)
     : StorageService.getRegistrations();
+
+  if (regs.length === 0) {
+    window.showToast?.("No records available to export.", "warning");
+    return;
+  }
+
   const headers = [
     "Registration ID",
     "Event ID",
+    "Event Title",
     "Student ID",
     "Student Name",
     "Email",
@@ -313,6 +328,7 @@ const exportRegistrationsCSV = (eventId) => {
   const rows = regs.map((r) => [
     r.regId,
     r.eventId,
+    StorageService.getEventById(r.eventId)?.title || r.eventId,
     r.studentId,
     r.name,
     r.email,
@@ -326,6 +342,7 @@ const exportRegistrationsCSV = (eventId) => {
     rows,
     `Registrations${eventId ? "-" + eventId : ""}.csv`
   );
+  window.showToast?.("CSV exported successfully.", "success");
 };
 
 /**
@@ -338,8 +355,16 @@ const exportAttendanceCSV = (eventId) => {
   const regs = eventId
     ? StorageService.getRegistrationsByEvent(eventId)
     : StorageService.getRegistrations();
+
+  if (regs.length === 0) {
+    window.showToast?.("No records available to export.", "warning");
+    return;
+  }
+
   const headers = [
     "Registration ID",
+    "Event ID",
+    "Event Title",
     "Student Name",
     "Roll Number",
     "Email",
@@ -349,6 +374,8 @@ const exportAttendanceCSV = (eventId) => {
   ];
   const rows = regs.map((r) => [
     r.regId,
+    r.eventId,
+    StorageService.getEventById(r.eventId)?.title || r.eventId,
     r.name,
     r.studentId,
     r.email,
@@ -361,6 +388,7 @@ const exportAttendanceCSV = (eventId) => {
     rows,
     `Attendance${eventId ? "-" + eventId : ""}.csv`
   );
+  window.showToast?.("CSV exported successfully.", "success");
 };
 
 /**
@@ -372,23 +400,42 @@ const exportFeedbackCSV = (eventId) => {
   const feedbacks = eventId
     ? StorageService.getFeedbackByEvent(eventId)
     : StorageService.getFeedback();
+
+  if (feedbacks.length === 0) {
+    window.showToast?.("No records available to export.", "warning");
+    return;
+  }
+
+  // Look up student names from registrations for enriched CSV
+  const allRegs = StorageService.getRegistrations();
+
   const headers = [
     "Feedback ID",
     "Student ID",
+    "Student Name",
     "Event ID",
+    "Event Title",
     "Rating",
     "Comments",
     "Created At",
   ];
-  const rows = feedbacks.map((f) => [
-    f.feedbackId,
-    f.studentId,
-    f.eventId,
-    f.rating,
-    f.comment || f.comments || "",
-    f.timestamp || "",
-  ]);
+  const rows = feedbacks.map((f) => {
+    const reg = allRegs.find(
+      (r) => r.studentId === f.studentId && r.eventId === f.eventId
+    );
+    return [
+      f.feedbackId,
+      f.studentId,
+      reg ? reg.name : f.studentId,
+      f.eventId,
+      StorageService.getEventById(f.eventId)?.title || f.eventId,
+      f.rating,
+      f.comment || f.comments || "",
+      f.timestamp || "",
+    ];
+  });
   downloadCSV(headers, rows, `Feedback${eventId ? "-" + eventId : ""}.csv`);
+  window.showToast?.("CSV exported successfully.", "success");
 };
 
 // ─── Event binding ────────────────────────────────────────────────────────

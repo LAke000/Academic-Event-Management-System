@@ -179,16 +179,20 @@ const renderDiscover = () => {
   const discoverList = document.getElementById("discover-list");
   const banner = document.getElementById("reminders-banner-discover");
 
+  const controls = document.querySelector(".discover-controls");
+
   if (events.length === 0) {
     if (discoverEmpty) discoverEmpty.hidden = false;
     if (discoverList) discoverList.hidden = true;
     if (banner) banner.hidden = true;
+    if (controls) controls.hidden = true;
     discoverContainer.innerHTML = "";
     return;
   }
   if (discoverEmpty) discoverEmpty.hidden = true;
   if (discoverList) discoverList.hidden = false;
   if (banner) banner.hidden = false;
+  if (controls) controls.hidden = false;
 
   const reminders = StorageService.getReminders();
 
@@ -423,6 +427,12 @@ const renderAdminTable = () => {
     const fillPercent =
       capacity > 0 ? Math.round((registeredCount / capacity) * 100) : 0;
 
+    // Compute live status from registration count, capacity, and deadline
+    const isFull = registeredCount >= capacity;
+    const isPastDeadline = ev.deadline && new Date() > new Date(ev.deadline);
+    const liveStatus = isFull ? "Housefull" : isPastDeadline ? "Closed" : "Open";
+    const badgeCls = isFull ? "bg-danger" : isPastDeadline ? "bg-warning" : "bg-success";
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(ev.title)}</td>
@@ -432,7 +442,7 @@ const renderAdminTable = () => {
       <td>${new Date(ev.date).toLocaleString()}</td>
       <td>${capacity}</td>
       <td>${registeredCount}</td>
-      <td><span class="badge ${ev.status === "Housefull" ? "bg-danger" : "bg-success"}">${escapeHtml(ev.status)}</span></td>
+      <td><span class="badge ${badgeCls}">${escapeHtml(liveStatus)}</span></td>
       <td>
         <button class="btn btn-sm btn-outline btn-edit-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Edit</button>
         <button class="btn btn-sm btn-ghost btn-view-roster" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Roster</button>

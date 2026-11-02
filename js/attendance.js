@@ -557,7 +557,12 @@ const applyRosterFilters = (regs) => {
   const term = query.toLowerCase().trim();
   return regs.filter((reg) => {
     if (eventId && reg.eventId !== eventId) return false;
-    if (status && reg.status !== status) return false;
+    // Dual-state consistency: check both top-level and nested attendance status
+    if (status) {
+      const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
+      const effectiveStatus = isPresent ? "Present" : "Registered";
+      if (effectiveStatus !== status) return false;
+    }
     if (term) {
       const haystack = [
         reg.name || "",
@@ -639,7 +644,9 @@ const renderRoster = () => {
   rosterTableBody.innerHTML = "";
   regs.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
-    const statusBadge = reg.status === "Present"
+    // Dual-state consistency: check both top-level and nested attendance status
+    const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
+    const statusBadge = isPresent
       ? "<span class='badge badge--success'>Present</span>"
       : "<span class='badge badge--pending'>Registered</span>";
     const checkInDisplay = reg.checkInTime ? formatDate(reg.checkInTime) : "—";
@@ -717,7 +724,12 @@ const escapeHtml = (str) => {
 };
 
 // ─── Event binding ────────────────────────────────────────────────────────
+let eventsBound = false;
+
 const bindEvents = () => {
+  if (eventsBound) return;
+  eventsBound = true;
+
   // Inline scanner controls (scanner tab)
   if (btnStartScanner) {
     btnStartScanner.addEventListener("click", () => startScanner());
@@ -821,7 +833,10 @@ const bindEvents = () => {
 const init = () => {
   resolveRefs();
   bindEvents();
-  updateScannerUI(false); // ensure scanner starts in idle state
+  if (!scannerRunning) {
+    updateScannerUI(false);
+  }
+  renderLiveCheckinFeed();
 };
 
 const AttendanceModule = {

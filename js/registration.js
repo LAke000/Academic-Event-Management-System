@@ -259,14 +259,21 @@ const handleRegistrationSubmit = (event) => {
   }
   renderPasses();
   try {
-    window.EventsModule?.render?.();
-    window.app?.renderHistory?.();
-    window.app?.renderDashboardStats?.();
-    if (typeof window.app?.updateProfileChip === "function") {
-      window.app.updateProfileChip(StorageService.getActiveRole() || "student");
-    }
+    // Sync all modules after registration so Roster, Reports, Discover,
+    // History, Dashboard, and ProfileChip all update in unison.
+    window.app?.refreshAllModules?.(StorageService.getActiveRole() || "student");
   } catch (_err) {
-    // non-fatal: dashboard / history / chip update is cosmetic
+    // Fallback: update individual modules if refreshAllModules is unavailable
+    try {
+      window.EventsModule?.render?.();
+      window.app?.renderHistory?.();
+      window.app?.renderDashboardStats?.();
+      if (typeof window.app?.updateProfileChip === "function") {
+        window.app.updateProfileChip(StorageService.getActiveRole() || "student");
+      }
+    } catch (_innerErr) {
+      // non-fatal: dashboard / history / chip update is cosmetic
+    }
   }
 };
 
@@ -459,7 +466,11 @@ const showPassQR = (regId) => {
   const event = StorageService.getEventById(reg.eventId);
 
   // Populate pass detail fields.
-  if (passBadge) passBadge.textContent = reg.attendance ? reg.attendance.status : reg.status || "Registered";
+  const statusVal = reg.attendance?.status || reg.status || "Registered";
+  if (passBadge) {
+    passBadge.textContent = statusVal;
+    passBadge.className = `pass-badge status-badge ${statusVal.toLowerCase()}`;
+  }
   if (passTitle) passTitle.textContent = event ? event.title : "Unknown Event";
   if (passDepartment) passDepartment.textContent = reg.department || "";
   if (passVenue) passVenue.textContent = event ? event.venue : "—";
