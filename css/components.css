@@ -928,6 +928,18 @@ input[type="radio"] {
   color: var(--color-text-inverse);
 }
 
+.btn-card-drop-seat,
+.btn-drop-seat {
+  color: var(--status-housefull);
+  border-color: var(--status-housefull);
+}
+
+.btn-card-drop-seat:hover:not(:disabled),
+.btn-drop-seat:hover:not(:disabled) {
+  background-color: var(--status-housefull);
+  color: var(--color-text-inverse);
+}
+
 /* 7. Empty States */
 .empty-state {
   display: flex;

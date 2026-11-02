@@ -31,6 +31,8 @@ const resolveRefs = () => {
   searchInput = document.getElementById("event-search-input");
   deptFilter = document.getElementById("dept-filter-select");
   typeFilter = document.getElementById("type-filter-select");
+  availFilter = document.getElementById("avail-filter-select");
+  dateFilterInput = document.getElementById("date-filter-input");
 
   createDialog = document.getElementById("event-create-dialog");
   createForm = document.getElementById("event-create-form");
@@ -195,11 +197,8 @@ const eventHasSeats = (event) => {
 const eventMatchesDate = (event, dateStr) => {
   if (!dateStr) return true;
   if (!event.date) return false;
-  const eventDate = new Date(event.date);
-  const filterDate = new Date(dateStr);
-  if (Number.isNaN(eventDate.getTime()) || Number.isNaN(filterDate.getTime()))
-    return false;
-  return eventDate.toDateString() === filterDate.toDateString();
+  const localIso = toLocalDatetimeInput(event.date);
+  return localIso ? localIso.slice(0, 10) === dateStr : false;
 };
 
 const matchesFilters = (event) => {
@@ -309,9 +308,17 @@ const renderDiscover = () => {
 
     // Check if the active student is already registered for this event.
     const activeStudentId = StorageService.getActiveStudentId();
-    const alreadyRegistered =
-      activeStudentId &&
-      registrations.some((r) => r.studentId === activeStudentId);
+    const activeReg =
+      activeStudentId && activeStudentId !== "ALL"
+        ? registrations.find((r) => r.studentId === activeStudentId)
+        : null;
+    const alreadyRegistered = Boolean(activeReg);
+    const isPresent =
+      activeReg &&
+      (activeReg.status === "Present" || activeReg.attendance?.status === "Present");
+    const isAbsent =
+      activeReg &&
+      (activeReg.status === "Absent" || activeReg.attendance?.status === "Absent");
 
     const card = document.createElement("div");
     card.className = "event-card";
@@ -352,22 +359,42 @@ const renderDiscover = () => {
           <span>${registeredCount}/${capacity} seats</span>
           <span>${escapeHtml(badge.label)}</span>
         </div>
-        <div class="event-card-footer" style="display:flex; gap: var(--space-sm); flex-wrap: wrap;">
+        <div class="event-card-footer" style="display:flex; gap: var(--space-xs); flex-wrap: wrap; align-items: center;">
           ${alreadyRegistered
             ? `<span class="status-badge registered">Registered ✓</span>
-               <button class="btn btn-ghost btn-sm btn-view-my-pass" data-id="${event.id}" data-regid="${registrations.find((r) => r.studentId === activeStudentId)?.regId || ""}">View My Pass</button>`
-            : `<button class="btn btn-primary btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
-                ${isClosed ? (isPastDeadline ? "Deadline Passed" : "Full") : "Register Now"}
-              </button>`
+               <button class="btn btn-ghost btn-sm btn-view-my-pass" data-id="${event.id}" data-regid="${activeReg.regId}">View My Pass</button>
+               ${!isPresent && !isAbsent
+                 ? `<button class="btn btn-outline btn-sm btn-card-drop-seat" data-regid="${activeReg.regId}">Drop Seat</button>`
+                 : ""}`
+            : ""
           }
+          <button class="btn ${alreadyRegistered ? "btn-outline btn-sm" : "btn-primary"} btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
+            ${isClosed
+              ? isPastDeadline
+                ? "Registration Closed"
+                : "Event Full"
+              : alreadyRegistered
+              ? "Register Another Student"
+              : "Register Now"}
+          </button>
         </div>
       </div>
     `;
 
     const btnRegister = card.querySelector(".btn-register");
-    if (btnRegister && !isClosed && !alreadyRegistered) {
+    if (btnRegister && !isClosed) {
       btnRegister.addEventListener("click", () => {
         openRegistrationModal(event.id);
+      });
+    }
+
+    const btnDropSeat = card.querySelector(".btn-card-drop-seat");
+    if (btnDropSeat) {
+      btnDropSeat.addEventListener("click", () => {
+        const regId = btnDropSeat.dataset.regid;
+        if (regId && typeof window.RegistrationModule?.cancelRegistration === "function") {
+          window.RegistrationModule.cancelRegistration(regId);
+        }
       });
     }
 
@@ -764,23 +791,66 @@ const initCreateEventModal = () => {
       : "";
     const venue = formFields.venue ? formFields.venue.value.trim() : "";
     const dateTime = formFields.dateTime ? formFields.dateTime.value : "";
+    const endTime = formFields.endTime ? formFields.endTime.value : "";
+    const description = formFields.description
+      ? formFields.description.value.trim()
+      : "";
     const capacity = formFields.capacity
       ? parseInt(formFields.capacity.value, 10)
       : NaN;
     const speaker = formFields.speaker ? formFields.speaker.value.trim() : "";
     const type = formFields.type ? formFields.type.value : "";
+    const deadline = formFields.deadline ? formFields.deadline.value : "";
 
     // Validation
-    if (
-      !title ||
-      !department ||
-      !venue ||
-      !dateTime ||
-      isNaN(capacity) ||
-      capacity <= 0 ||
-      !speaker
-    ) {
-      window.showToast("Please fill all fields correctly.", "error");
+    if (!title || !department || !venue || !speaker) {
+      window.showToast(
+        "Validation Error: Title, Department, Venue, and Speaker are required.",
+        "error"
+      );
+      return;
+    }
+
+    if (!dateTime || Number.isNaN(new Date(dateTime).getTime())) {
+      window.showToast(
+        "Validation Error: Please enter a valid Event Date & Time.",
+        "error"
+      );
+      return;
+    }
+
+    if (Number.isNaN(capacity) || capacity < 1) {
+      window.showToast(
+        "Validation Error: Seat capacity must be at least 1.",
+        "error"
+      );
+      return;
+    }
+
+    // Past date check: new events cannot be scheduled in the past
+    if (!editingEventId && new Date(dateTime) < new Date()) {
+      window.showToast(
+        "Validation Error: Event date cannot be in the past.",
+        "error"
+      );
+      return;
+    }
+
+    // End time check: end time must be after start time
+    if (endTime && new Date(endTime) <= new Date(dateTime)) {
+      window.showToast(
+        "Validation Error: End Date & Time must be after the Start Date & Time.",
+        "error"
+      );
+      return;
+    }
+
+    // Deadline check: registration deadline must be on or before the event start date
+    if (!deadline || new Date(deadline) > new Date(dateTime)) {
+      window.showToast(
+        "Validation Error: Registration deadline must be on or before the event start date.",
+        "error"
+      );
       return;
     }
 
@@ -790,17 +860,6 @@ const initCreateEventModal = () => {
     do {
       eventId = generateId("EVT-", 4);
     } while (existingIds.includes(eventId));
-
-    const deadline = formFields.deadline ? formFields.deadline.value : "";
-
-    // Validation: registration deadline must not be after the event start time.
-    if (deadline && new Date(deadline) > new Date(dateTime)) {
-      window.showToast(
-        "Registration deadline must be before the event start date and time.",
-        "error"
-      );
-      return;
-    }
 
     // Compute the actual registration count so status reflects reality
     const currentRegCount = editingEventId
@@ -826,11 +885,13 @@ const initCreateEventModal = () => {
       department,
       venue,
       date: new Date(dateTime).toISOString(),
+      endTime: endTime ? new Date(endTime).toISOString() : "",
       deadline: deadline ? new Date(deadline).toISOString() : "",
       capacity,
       registered: currentRegCount,
       status: isFull ? "Housefull" : "Open",
       speaker,
+      description,
     };
 
     let saved;
@@ -901,6 +962,12 @@ const openEditEventDialog = (eventId) => {
   if (formFields.dateTime) {
     // datetime-local expects "YYYY-MM-DDTHH:MM" (no seconds), in local time.
     formFields.dateTime.value = toLocalDatetimeInput(event.date);
+  }
+  if (formFields.endTime) {
+    formFields.endTime.value = toLocalDatetimeInput(event.endTime);
+  }
+  if (formFields.description) {
+    formFields.description.value = event.description || "";
   }
   if (formFields.capacity) formFields.capacity.value = event.capacity;
   if (formFields.speaker) formFields.speaker.value = event.speaker;
