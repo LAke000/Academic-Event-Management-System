@@ -166,10 +166,32 @@ const FeedbackModule = (() => {
     feedbackDialog.showModal();
   };
 
+  // ─── Inline Form Error Banner Helpers ─────────────────────────────────────
+
+  const showFeedbackError = (msg) => {
+    const errEl = document.getElementById("feedback-form-error");
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.hidden = false;
+    }
+    if (typeof window.showToast === "function") {
+      window.showToast(msg, "error");
+    }
+  };
+
+  const clearFeedbackError = () => {
+    const errEl = document.getElementById("feedback-form-error");
+    if (errEl) {
+      errEl.textContent = "";
+      errEl.hidden = true;
+    }
+  };
+
   /**
    * Reset the dialog form to a clean state.
    */
   const resetFeedbackForm = () => {
+    clearFeedbackError();
     selectedRating = 0;
     highlightStars(0);
     updateStarHint(0);
@@ -188,6 +210,7 @@ const FeedbackModule = (() => {
    * Close the feedback dialog gracefully.
    */
   const closeFeedbackDialog = () => {
+    clearFeedbackError();
     if (feedbackDialog && typeof feedbackDialog.close === "function") {
       feedbackDialog.close();
     }
@@ -202,18 +225,15 @@ const FeedbackModule = (() => {
    */
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
+    clearFeedbackError();
 
     if (selectedRating === 0) {
-      if (typeof window.showToast === "function") {
-        window.showToast("Please select a star rating.", "error");
-      }
+      showFeedbackError("Please select a star rating.");
       return;
     }
 
     if (!activeEventIdForFeedback || !activeStudentIdForFeedback) {
-      if (typeof window.showToast === "function") {
-        window.showToast("Feedback context lost. Please try again.", "error");
-      }
+      showFeedbackError("Feedback context lost. Please try again.");
       return;
     }
 
@@ -226,9 +246,7 @@ const FeedbackModule = (() => {
 
     // Validate comment — require at least a few characters of constructive input
     if (comment.length > 0 && comment.length < 5) {
-      if (typeof window.showToast === "function") {
-        window.showToast("Please write at least 5 characters, or leave the comments field empty.", "error");
-      }
+      showFeedbackError("Please write at least 5 characters, or leave the comments field empty.");
       return;
     }
 
@@ -238,10 +256,7 @@ const FeedbackModule = (() => {
       (f) => f.eventId === activeEventIdForFeedback && f.studentId === activeStudentIdForFeedback
     );
     if (duplicate) {
-      if (typeof window.showToast === "function") {
-        window.showToast("Feedback already submitted for this event.", "warning");
-      }
-      closeFeedbackDialog();
+      showFeedbackError("Feedback already submitted for this event.");
       return;
     }
 

@@ -24,6 +24,7 @@ const REGISTRATION_MARKUP = `
       <button class="dialog-close" aria-label="Close dialog">&times;</button>
     </header>
     <form id="${FORM_ID}" novalidate>
+      <div id="reg-form-error" role="alert" hidden style="padding: 10px 12px; margin-bottom: 12px; border-radius: 6px; background: #fee2e2; color: #b91c1c; font-size: 0.875rem; font-weight: 500;"></div>
       <input type="hidden" name="eventId" id="reg-event-id">
       <div class="form-field">
         <label class="form-label" for="reg-student-name">Student Name</label>
@@ -109,6 +110,27 @@ const formatDateTime = (iso) => {
   }
 };
 
+// ─── Inline Form Error Banner Helpers ─────────────────────────────────────
+
+const showRegFormError = (msg) => {
+  const errEl = document.getElementById("reg-form-error");
+  if (errEl) {
+    errEl.textContent = msg;
+    errEl.hidden = false;
+  }
+  if (typeof window.showToast === "function") {
+    window.showToast(msg, "error");
+  }
+};
+
+const clearRegFormError = () => {
+  const errEl = document.getElementById("reg-form-error");
+  if (errEl) {
+    errEl.textContent = "";
+    errEl.hidden = true;
+  }
+};
+
 // ─── Registration flow ────────────────────────────────────────────────────
 
 /**
@@ -117,6 +139,7 @@ const formatDateTime = (iso) => {
  * @param {string} eventId
  */
 const openRegistrationModal = (eventId) => {
+  clearRegFormError();
   const event = StorageService.getEventById(eventId);
   if (!event) {
     window.showToast("Event not found.", "error");
@@ -158,6 +181,7 @@ const openRegistrationModal = (eventId) => {
  * Close the registration dialog.
  */
 const closeRegistrationModal = () => {
+  clearRegFormError();
   if (dialogEl && typeof dialogEl.close === "function") {
     dialogEl.close();
   }
@@ -182,6 +206,7 @@ const validateRegistration = (name, studentId, email, department) => {
  */
 const handleRegistrationSubmit = (event) => {
   event.preventDefault();
+  clearRegFormError();
 
   const name = fieldName.value.trim();
   const studentId = fieldStudentId.value.trim();
@@ -191,7 +216,7 @@ const handleRegistrationSubmit = (event) => {
 
   const validationError = validateRegistration(name, studentId, email, department);
   if (validationError) {
-    window.showToast(validationError, "error");
+    showRegFormError(validationError);
     return;
   }
 
@@ -204,9 +229,8 @@ const handleRegistrationSubmit = (event) => {
     (r) => (r.email || "").toLowerCase() === email.toLowerCase()
   );
   if (dupRoll || dupEmail) {
-    window.showToast(
-      `Already registered: ${dupRoll ? "Roll No. " + studentId : "Email " + email} is already registered for this event.`,
-      "error"
+    showRegFormError(
+      `Already registered: ${dupRoll ? "Roll No. " + studentId : "Email " + email} is already registered for this event.`
     );
     return;
   }
@@ -214,17 +238,17 @@ const handleRegistrationSubmit = (event) => {
   // Capacity gate — current registrations vs. event capacity.
   const ev = StorageService.getEventById(eventId);
   if (!ev) {
-    window.showToast("Event not found.", "error");
+    showRegFormError("Event not found.");
     return;
   }
   if (existingRegs.length >= (ev.capacity || 0)) {
-    window.showToast("Event is at full capacity.", "error");
+    showRegFormError("Event is at full capacity.");
     return;
   }
 
   // Deadline gate — registration must close before the event deadline.
   if (ev.deadline && new Date() > new Date(ev.deadline)) {
-    window.showToast("Registration deadline has passed for this event.", "error");
+    showRegFormError("Registration deadline has passed for this event.");
     return;
   }
 
@@ -251,7 +275,7 @@ const handleRegistrationSubmit = (event) => {
   allRegs.push(newReg);
   const saved = StorageService.saveRegistrations(allRegs);
   if (!saved) {
-    window.showToast("Failed to save registration. Storage may be full.", "error");
+    showRegFormError("Failed to save registration. Storage may be full.");
     return;
   }
 
@@ -719,6 +743,7 @@ const bindEvents = () => {
   const clearBtn = document.getElementById("reg-clear-btn") || btnClear;
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
+      clearRegFormError();
       const curEventId = fieldEventId ? fieldEventId.value : "";
       if (form) form.reset();
       if (fieldEventId && curEventId) fieldEventId.value = curEventId;
