@@ -284,6 +284,10 @@
             <button class="btn btn-primary" id="btn-start-scanner">Start Camera</button>
             <button class="btn btn-ghost" id="btn-stop-scanner" disabled>Stop Camera</button>
             <button class="btn btn-ghost" id="btn-camera-toggle" disabled>Switch Camera</button>
+            <label class="btn btn-outline" for="qr-file-input" style="cursor: pointer; margin: 0;">
+              Upload &amp; Scan QR Image
+              <input type="file" id="qr-file-input" accept="image/*" hidden>
+            </label>
           </div>
         </div>
         <div id="scanner-view" class="scanner-view" hidden>
@@ -474,6 +478,7 @@
         </div>
       </div>
       <footer class="dialog-footer">
+        <button class="btn btn-outline" id="btn-download-qr">Download QR (PNG)</button>
         <button class="btn btn-ghost" id="btn-print-pass">Print Pass</button>
         <button class="btn btn-outline" id="btn-copy-qr-payload">Copy QR Payload</button>
         <button class="btn btn-primary" id="btn-close-pass">Close</button>

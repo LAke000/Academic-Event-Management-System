@@ -678,12 +678,18 @@ const renderHistory = () => {
   regs.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
     // Dual-state consistency: respect both top-level and nested attendance status
+    const isCancelled =
+      event?.status === "Cancelled" ||
+      reg.status === "Cancelled" ||
+      (reg.attendance && reg.attendance.status === "Cancelled");
     const isPresent =
-      reg.status === "Present" ||
-      (reg.attendance && reg.attendance.status === "Present");
+      !isCancelled &&
+      (reg.status === "Present" ||
+        (reg.attendance && reg.attendance.status === "Present"));
     const isAbsent =
-      reg.status === "Absent" ||
-      (reg.attendance && reg.attendance.status === "Absent");
+      !isCancelled &&
+      (reg.status === "Absent" ||
+        (reg.attendance && reg.attendance.status === "Absent"));
     const checkInTimestamp = reg.checkInTime || reg.attendance?.checkInTime;
     const item = document.createElement("div");
     item.className = "history-item card";
@@ -693,7 +699,9 @@ const renderHistory = () => {
       : (event ? formatDate(event.date) : "—");
 
     let statusBadge = "";
-    if (isPresent) {
+    if (isCancelled) {
+      statusBadge = `<span class="status-badge status-badge--absent">Cancelled</span>`;
+    } else if (isPresent) {
       statusBadge = `<span class="status-badge status-badge--present">Present</span>`;
     } else if (isAbsent) {
       statusBadge = `<span class="status-badge status-badge--absent">Absent</span>`;
@@ -717,7 +725,14 @@ const renderHistory = () => {
     }
 
     let actionsHtml = "";
-    if (isPresent) {
+    if (isCancelled) {
+      actionsHtml =
+        `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center;">` +
+        `<p class="history-item-note" style="margin:0; font-size: var(--font-xs); color: var(--color-danger, #dc2626); font-weight: 500;">
+          Event Cancelled — Attendance, Feedback, and Certificate are closed.
+        </p>` +
+        `</div>`;
+    } else if (isPresent) {
       const feedbackSubmitted = hasFeedback(reg);
       actionsHtml =
         `<div class="history-item-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm); flex-wrap: wrap;">` +

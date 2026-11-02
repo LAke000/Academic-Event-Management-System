@@ -210,6 +210,11 @@ const processQrPayload = (rawText, targetEventId) => {
     return { ok: false, type: "error", message: "Malformed QR payload — missing required fields." };
   }
 
+  const ev = StorageService.getEventById(eventId);
+  if (ev && ev.status === "Cancelled") {
+    return { ok: false, type: "error", message: `Cannot check in: Event "${ev.title}" is Cancelled.` };
+  }
+
   // Security hash validation if payload includes registrationHash
   const rawKey = `${eventId}:${studentId}:${regId}`;
   let hash = 0;
@@ -246,6 +251,14 @@ const processQrPayload = (rawText, targetEventId) => {
   }
 
   const reg = allRegs[regIndex];
+
+  if (reg.status === "Cancelled" || reg.attendance?.status === "Cancelled") {
+    return {
+      ok: false,
+      type: "error",
+      message: `Cannot check in: Registration ${regId} is Cancelled.`,
+    };
+  }
 
   // 4. Duplicate check — already marked Present (dual state for consistency)
   if (reg.status === "Present" || reg.attendance?.status === "Present") {
@@ -286,6 +299,13 @@ const processQrPayload = (rawText, targetEventId) => {
  * @returns {{ ok: boolean, type: string, message: string }}
  */
 const markStudentAttendance = (query, targetStatus, targetEventId) => {
+  if (targetEventId) {
+    const ev = StorageService.getEventById(targetEventId);
+    if (ev && ev.status === "Cancelled") {
+      return { ok: false, type: "error", message: `Cannot mark attendance: Event "${ev.title}" is Cancelled.` };
+    }
+  }
+
   if (!query || query.trim() === "") {
     return {
       ok: false,
@@ -386,6 +406,18 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
   // Dual-state consistency helpers
   const isRegPresent = (r) => r.status === "Present" || r.attendance?.status === "Present";
   const isRegAbsent = (r) => r.status === "Absent" || r.attendance?.status === "Absent";
+  const isCancelled = (r) =>
+    r.status === "Cancelled" ||
+    r.attendance?.status === "Cancelled" ||
+    StorageService.getEventById(r.eventId)?.status === "Cancelled";
+
+  if (matches.every(isCancelled)) {
+    return {
+      ok: false,
+      type: "error",
+      message: "Cannot mark attendance: Event or registration is Cancelled.",
+    };
+  }
 
   // When checking in by plain ID/Roll No. and all matching records are already Present, include timestamp
   if (targetStatus === "Present" && matches.every(isRegPresent)) {
@@ -404,6 +436,12 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
     const idx = allRegs.findIndex((r) => r.regId === match.regId);
     if (idx === -1) return;
     const reg = allRegs[idx];
+
+    // Skip records if cancelled
+    if (isCancelled(reg)) {
+      skipped++;
+      return;
+    }
 
     // Skip records already at the target status.
     if (targetStatus === "Present" && isRegPresent(reg)) {
@@ -1026,6 +1064,42 @@ const bindEvents = () => {
         await stopScanner();
       }
       await startScanner(newMode);
+    });
+  }
+
+  // Upload and decode QR pass from image file (for webcam-free evaluation)
+  const qrFileInput = document.getElementById("qr-file-input");
+  if (qrFileInput) {
+    qrFileInput.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          showScanToast("QR scanner library not loaded.", "error");
+          return;
+        }
+        if (scannerRunning) {
+          await stopScanner();
+        }
+        const scannerInstance = new Html5Qrcode("reader");
+        const decodedText = await scannerInstance.scanFile(file, true);
+        try {
+          scannerInstance.clear();
+        } catch (_e) {}
+        const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+        const result = processQrPayload(decodedText, targetEventId || undefined);
+        showScanToast(result.message, result.type);
+        if (result.ok) {
+          playChime();
+          renderLiveCheckinFeed();
+          renderRoster();
+          window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
+        }
+      } catch (err) {
+        showScanToast("Could not decode QR code from image.", "error");
+      } finally {
+        e.target.value = "";
+      }
     });
   }
 

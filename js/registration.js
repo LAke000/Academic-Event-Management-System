@@ -405,12 +405,17 @@ const renderPassCard = (reg) => {
   card.style.cssText =
     "border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;";
 
+  const isCancelled =
+    event?.status === "Cancelled" ||
+    reg.status === "Cancelled" ||
+    reg.attendance?.status === "Cancelled";
+
   // Normalize badge class to lowercase so .status-badge.present / .status-badge.registered
   // in css/components.css match regardless of stored casing.
-  const statusVal = reg.attendance?.status || reg.status || "Registered";
+  const statusVal = isCancelled ? "Cancelled" : (reg.attendance?.status || reg.status || "Registered");
   const badgeCls = statusVal.toLowerCase();
-  const isPresent = statusVal === "Present";
-  const isAbsent = statusVal === "Absent";
+  const isPresent = !isCancelled && statusVal === "Present";
+  const isAbsent = !isCancelled && statusVal === "Absent";
 
   card.innerHTML = `
     <div class="pass-card-header">
@@ -427,17 +432,22 @@ const renderPassCard = (reg) => {
       </div>
     </div>
     <div class="pass-card-actions">
-      ${isPresent
-        ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>`
+      ${isCancelled
+        ? `<button class="btn btn-ghost btn-sm" disabled style="color: var(--status-housefull);" title="This event has been cancelled.">Event Cancelled (Void)</button>
+           <button class="btn btn-outline btn-sm btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View Pass (Void)</button>`
+        : isPresent
+        ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>
+           <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
+           <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>`
         : isAbsent
-        ? `<button class="btn btn-ghost btn-sm" disabled title="Marked Absent — Certificate & Feedback Locked">Marked Absent (Locked)</button>`
+        ? `<button class="btn btn-ghost btn-sm" disabled title="Marked Absent — Certificate & Feedback Locked">Marked Absent (Locked)</button>
+           <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
+           <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>`
         : `<button class="btn btn-outline btn-sm btn-drop-seat" data-regid="${escapeHtml(
             reg.regId
-          )}" title="Cancel this registration and free the seat.">Drop Seat</button>`}
-      <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(
-        reg.regId
-      )}">View QR Ticket</button>
-      <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>
+          )}" title="Cancel this registration and free the seat.">Drop Seat</button>
+           <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>
+           <button class="btn btn-outline btn-sm btn-add-reminder" data-id="${reg.eventId}">Add Reminder (.ics)</button>`}
     </div>
   `;
   return card;
@@ -603,9 +613,13 @@ const showPassQR = (regId) => {
   }
 
   const event = StorageService.getEventById(reg.eventId);
+  const isCancelled =
+    event?.status === "Cancelled" ||
+    reg.status === "Cancelled" ||
+    reg.attendance?.status === "Cancelled";
 
   // Populate pass detail fields.
-  const statusVal = reg.attendance?.status || reg.status || "Registered";
+  const statusVal = isCancelled ? "Cancelled" : (reg.attendance?.status || reg.status || "Registered");
   if (passBadge) {
     passBadge.textContent = statusVal;
     passBadge.className = `pass-badge status-badge ${statusVal.toLowerCase()}`;
@@ -869,6 +883,40 @@ const bindEvents = () => {
           });
       } else {
         copyFallback(payload);
+      }
+    });
+  }
+
+  // Download QR pass image as PNG
+  const btnDownloadQr = document.getElementById("btn-download-qr");
+  if (btnDownloadQr) {
+    btnDownloadQr.addEventListener("click", () => {
+      const regId =
+        passDialog?.dataset.regid ||
+        passDialog?.querySelector("[data-regid]")?.dataset.regid;
+      const canvas = qrTarget ? qrTarget.querySelector("canvas") : null;
+      const img = qrTarget ? qrTarget.querySelector("img") : null;
+
+      if (!canvas && (!img || !img.src)) {
+        window.showToast("QR code image not available to download.", "warning");
+        return;
+      }
+
+      try {
+        const link = document.createElement("a");
+        link.download = `QR-Pass-${regId || "ticket"}.png`;
+        if (canvas) {
+          link.href = canvas.toDataURL("image/png");
+        } else if (img && img.src) {
+          link.href = img.src;
+        }
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.showToast("QR code downloaded as PNG.", "success");
+      } catch (err) {
+        console.error("QR download error:", err);
+        window.showToast("Failed to download QR code.", "error");
       }
     });
   }
