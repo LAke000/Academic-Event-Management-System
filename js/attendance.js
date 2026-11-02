@@ -256,22 +256,26 @@ const manualCheckIn = (query) => {
   }
   const term = query.trim();
   const allRegs = StorageService.getRegistrations();
-  // Match by studentId or regId (case‑insensitive)
+  // Match by studentId, regId, or student name (case‑insensitive)
   const matches = allRegs.filter(
-    (r) => r.studentId.toLowerCase() === term.toLowerCase() ||
-           r.regId.toLowerCase() === term.toLowerCase()
+    (r) =>
+      r.studentId.toLowerCase() === term.toLowerCase() ||
+      r.regId.toLowerCase() === term.toLowerCase() ||
+      (r.name && r.name.toLowerCase() === term.toLowerCase())
   );
 
   if (matches.length === 0) {
     return { ok: false, type: "error", message: `No registration found for "${term}".` };
   }
 
-  // Check for already‑present duplicates
-  const alreadyPresent = matches.filter((r) => r.status === "Present");
-  const pending = matches.filter((r) => r.status !== "Present");
+  // Check for already‑present duplicates using dual-state consistency
+  const isRegPresent = (r) => r.status === "Present" || r.attendance?.status === "Present";
+  const alreadyPresent = matches.filter(isRegPresent);
+  const pending = matches.filter((r) => !isRegPresent(r));
 
   if (pending.length === 0) {
-    const ts = alreadyPresent[0].checkInTime ? formatDate(alreadyPresent[0].checkInTime) : "—";
+    const firstPresentTs = alreadyPresent[0].checkInTime || alreadyPresent[0].attendance?.checkInTime;
+    const ts = firstPresentTs ? formatDate(firstPresentTs) : "—";
     return {
       ok: false,
       type: "warning",
@@ -299,6 +303,8 @@ const manualCheckIn = (query) => {
   window.app?.renderHistory?.();
   window.RegistrationModule?.renderPasses?.();
   window.EventsModule?.render?.();
+  window.ReportsModule?.renderCharts?.();
+  window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
 
   const names = pending.map((r) => r.name).join(", ");
   return {
@@ -440,13 +446,14 @@ const renderLiveCheckinFeed = () => {
   overrideTableBody.innerHTML = "";
   checkedIn.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
+    const ts = reg.checkInTime || reg.attendance?.checkInTime;
     const tr = document.createElement("tr");
     tr.innerHTML =
       `<td>${escapeHtml(reg.name)}</td>` +
       `<td>${escapeHtml(reg.studentId)}</td>` +
       `<td>${event ? escapeHtml(event.title) : reg.eventId}</td>` +
       `<td><span class="badge badge--success">Present</span></td>` +
-      `<td>${formatDate(reg.checkInTime)}</td>`;
+      `<td>${ts ? formatDate(ts) : "—"}</td>`;
     overrideTableBody.appendChild(tr);
   });
 };
@@ -649,7 +656,8 @@ const renderRoster = () => {
     const statusBadge = isPresent
       ? "<span class='badge badge--success'>Present</span>"
       : "<span class='badge badge--pending'>Registered</span>";
-    const checkInDisplay = reg.checkInTime ? formatDate(reg.checkInTime) : "—";
+    const ts = reg.checkInTime || reg.attendance?.checkInTime;
+    const checkInDisplay = ts ? formatDate(ts) : "—";
 
     const tr = document.createElement("tr");
     tr.innerHTML =
@@ -660,7 +668,7 @@ const renderRoster = () => {
       `<td>${escapeHtml(reg.email)}</td>` +
       `<td>${statusBadge}</td>` +
       `<td>${checkInDisplay}</td>` +
-      `<td>${reg.status !== "Present"
+      `<td>${!isPresent
         ? `<button class="btn btn-sm btn-primary btn-checkin" data-regid="${reg.regId}">Check In</button>`
         : "—"
       }</td>`;

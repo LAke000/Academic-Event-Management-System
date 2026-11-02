@@ -563,6 +563,7 @@ input[type="radio"] {
 .star-rating {
   display: flex;
   flex-direction: row-reverse;
+  justify-content: flex-end;
   gap: var(--space-xs);
   font-size: var(--font-xl);
   line-height: 1;

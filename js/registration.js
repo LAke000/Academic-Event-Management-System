@@ -348,7 +348,7 @@ const renderPasses = () => {
     return regs.some((r) => r.eventId === rem.eventId);
   });
   const registeredUpcoming = regs.filter(
-    (r) => r.status === "Registered"
+    (r) => (r.attendance?.status || r.status) === "Registered"
   );
 
   let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
@@ -371,11 +371,13 @@ const renderPasses = () => {
   passesList.innerHTML = "";
 
   if (regs.length === 0) {
+    if (banner) banner.hidden = true;
     passesEmpty.hidden = false;
     passesList.hidden = true;
     return;
   }
 
+  if (banner) banner.hidden = false;
   passesEmpty.hidden = true;
   passesList.hidden = false;
 
@@ -475,7 +477,11 @@ const showPassQR = (regId) => {
   if (passDepartment) passDepartment.textContent = reg.department || "";
   if (passVenue) passVenue.textContent = event ? event.venue : "—";
   if (passDateTime) passDateTime.textContent = event ? formatDateTime(event.date) : "—";
-  if (passStudentId) passStudentId.textContent = reg.studentId || "";
+  if (passStudentId) {
+    passStudentId.textContent = reg.name
+      ? `${reg.name} (${reg.studentId || "—"})`
+      : (reg.studentId || "—");
+  }
   if (passEmail) passEmail.textContent = reg.email || "";
   if (passRegId) passRegId.textContent = `Ticket ID: ${reg.regId}`;
 

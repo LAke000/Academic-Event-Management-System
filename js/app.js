@@ -289,8 +289,19 @@ const refreshStudentSwitcher = (role) => {
         switcher.appendChild(opt);
       }
     });
+    const validVal =
+      currentVal === "ALL" || seen.has(currentVal)
+        ? currentVal
+        : seen.size > 0
+        ? [...seen][0]
+        : "ALL";
+    if (validVal !== currentVal) {
+      try {
+        StorageService.setActiveStudentId(validVal);
+      } catch (_err) {}
+    }
+    switcher.value = validVal;
   } catch (_err) {}
-  switcher.value = currentVal;
 };
 
 const updateProfileChip = (role) => {
@@ -492,6 +503,8 @@ const renderDashboardStats = () => {
 
     const dashEmpty = document.getElementById("dashboard-empty");
     if (dashEmpty) dashEmpty.hidden = events.length > 0;
+    const dashActions = document.querySelector("#dashboard .dashboard-actions");
+    if (dashActions) dashActions.hidden = events.length === 0;
   } catch (err) {
     console.error("[app] Failed to render dashboard stats:", err);
   }

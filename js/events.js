@@ -59,8 +59,9 @@ const escapeHtml = (str) => {
   return div.innerHTML;
 };
 
-const badgeFor = (registeredCount, capacity) => {
+const badgeFor = (registeredCount, capacity, isPastDeadline = false) => {
   if (registeredCount >= capacity) return { label: "Housefull", cls: "bg-danger" };
+  if (isPastDeadline) return { label: "Registration Closed", cls: "bg-warning" };
   const pct = capacity > 0 ? Math.round((registeredCount / capacity) * 100) : 0;
   if (pct >= 80) return { label: "Fast Filling", cls: "bg-warning" };
   return { label: "Seats Available", cls: "bg-success" };
@@ -256,7 +257,7 @@ const renderDiscover = () => {
     const isPastDeadline =
       event.deadline && new Date() > new Date(event.deadline);
     const isClosed = isFull || isPastDeadline;
-    const badge = badgeFor(registeredCount, capacity);
+    const badge = badgeFor(registeredCount, capacity, isPastDeadline);
 
     // Check if the active student is already registered for this event.
     const activeStudentId = StorageService.getActiveStudentId();
@@ -516,12 +517,7 @@ const deleteEvent = (eventId) => {
   renderDiscover();
   renderAdminTable();
   populateFilters();
-  window.app?.renderDashboardStats?.();
-  try { window.RegistrationModule?.renderPasses?.(); } catch (_err) {}
-  try { window.app?.renderHistory?.(); } catch (_err) {}
-  try { window.AttendanceModule?.renderRoster?.(); } catch (_err) {}
-  try { window.FeedbackModule?.renderAdminDashboard?.(); } catch (_err) {}
-  try { window.ReportsModule?.renderCharts?.(); } catch (_err) {}
+  window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
   window.showToast(`Event ${eventId} deleted.`, "success");
 };
 
@@ -539,9 +535,10 @@ const sendReminder = (eventId) => {
   }
 
   const regs = StorageService.getRegistrationsByEvent(eventId);
-  const attendees = regs.filter(
-    (r) => r.status === "Registered" || r.status === "Present"
-  );
+  const attendees = regs.filter((r) => {
+    const st = r.attendance?.status || r.status;
+    return st === "Registered" || st === "Present";
+  });
 
   if (attendees.length === 0) {
     window.showToast(

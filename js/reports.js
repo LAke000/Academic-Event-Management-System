@@ -143,6 +143,9 @@ const renderAnalytics = () => {
     reportEventFilter.className = "filter-select";
     reportEventFilter.style.cssText =
       "padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); margin-left: var(--space-md); min-width: 200px;";
+    reportEventFilter.addEventListener("change", () => {
+      renderAnalytics();
+    });
     reportActions.insertBefore(reportEventFilter, reportActions.firstChild);
   }
   if (reportEventFilter) {
@@ -169,6 +172,15 @@ const renderAnalytics = () => {
     return;
   }
 
+  // Scope datasets to selected event if filtered
+  const selectedEventId = reportEventFilter ? reportEventFilter.value : "";
+  const scopedEvents = selectedEventId
+    ? events.filter((ev) => ev.id === selectedEventId)
+    : events;
+  const scopedRegistrations = selectedEventId
+    ? registrations.filter((r) => r.eventId === selectedEventId)
+    : registrations;
+
   // ── Bar chart data: Total Registered vs Marked Present per event ──
   // Both series are derived from live registration records rather than the
   // stored `ev.registered` counter, so the chart always reflects the current
@@ -182,18 +194,22 @@ const renderAnalytics = () => {
         (r.status === "Present" || r.attendance?.status === "Present")
     ).length;
 
-  const eventLabels = events.map((ev) => ev.title || ev.id);
-  const registeredData = events.map(registeredForEvent);
-  const presentData = events.map(presentForEvent);
+  const eventLabels = scopedEvents.map((ev) => ev.title || ev.id);
+  const registeredData = scopedEvents.map(registeredForEvent);
+  const presentData = scopedEvents.map(presentForEvent);
 
   // ── Doughnut chart data: registrations grouped by department ──
   const deptCounts = {};
-  registrations.forEach((r) => {
+  scopedRegistrations.forEach((r) => {
     const dept = r.department || "Unknown";
     deptCounts[dept] = (deptCounts[dept] || 0) + 1;
   });
-  const deptLabels = Object.keys(deptCounts);
-  const deptData = Object.values(deptCounts);
+  const deptLabels =
+    Object.keys(deptCounts).length > 0
+      ? Object.keys(deptCounts)
+      : ["No Registrations"];
+  const deptData =
+    Object.values(deptCounts).length > 0 ? Object.values(deptCounts) : [0];
 
   // ── Destroy prior instances to prevent canvas reuse / memory leaks ──
   destroyChartInstance(ATTENDANCE_CHART_ID);
