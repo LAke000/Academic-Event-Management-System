@@ -312,6 +312,89 @@ class StorageService {
   static seedDemoData(force = false) {
     if (localStorage.getItem(CLEARED_FLAG_KEY) === "true" && !force) return;
     const existing = this.getEvents();
+
+    // Auto-backfill legacy seeded demo records if loaded from an earlier session
+    if (
+      existing.length > 0 &&
+      !force &&
+      existing.some((ev) => ev.id === "EVT-101" && !ev.endTime)
+    ) {
+      const demoEventDefaults = {
+        "EVT-101": {
+          endTime: "2026-11-15T12:00:00",
+          description:
+            "Hands-on deep learning workshop covering neural network architectures, CNNs, and computer vision pipelines.",
+        },
+        "EVT-102": {
+          endTime: "2026-11-17T17:00:00",
+          description:
+            "Comprehensive seminar on threat modeling, zero-trust architectures, and proactive campus network defense.",
+        },
+        "EVT-103": {
+          endTime: "2026-11-20T14:00:00",
+          description:
+            "Interactive continuum mechanics and biomimetic robotics session with live lab hardware demonstrations.",
+        },
+        "EVT-104": {
+          type: "Guest Lecture",
+          endTime: "2026-11-22T12:30:00",
+          description:
+            "Distinguished guest lecture on rapid sprint frameworks and human-centered design for sustainable campus infrastructure.",
+        },
+      };
+
+      let eventsUpdated = false;
+      existing.forEach((ev) => {
+        if (demoEventDefaults[ev.id]) {
+          const d = demoEventDefaults[ev.id];
+          if (!ev.endTime && d.endTime) {
+            ev.endTime = d.endTime;
+            eventsUpdated = true;
+          }
+          if (!ev.description && d.description) {
+            ev.description = d.description;
+            eventsUpdated = true;
+          }
+          if (d.type && ev.id === "EVT-104" && ev.type !== "Guest Lecture") {
+            ev.type = d.type;
+            eventsUpdated = true;
+          }
+        }
+      });
+      if (eventsUpdated) {
+        this.saveEvents(existing);
+      }
+
+      // Backfill feedback categorical ratings
+      const existingFb = this.getFeedback();
+      const fbDefaults = {
+        "FB-8801": { speakerQuality: 5, contentRelevance: 5, venueOrganization: 5 },
+        "FB-8802": { speakerQuality: 4, contentRelevance: 5, venueOrganization: 4 },
+        "FB-8803": { speakerQuality: 5, contentRelevance: 5, venueOrganization: 4 },
+      };
+      let fbUpdated = false;
+      existingFb.forEach((fb) => {
+        if (fbDefaults[fb.feedbackId]) {
+          const d = fbDefaults[fb.feedbackId];
+          if (!fb.speakerQuality) {
+            fb.speakerQuality = d.speakerQuality;
+            fbUpdated = true;
+          }
+          if (!fb.contentRelevance) {
+            fb.contentRelevance = d.contentRelevance;
+            fbUpdated = true;
+          }
+          if (!fb.venueOrganization) {
+            fb.venueOrganization = d.venueOrganization;
+            fbUpdated = true;
+          }
+        }
+      });
+      if (fbUpdated) {
+        this.saveFeedback(existingFb);
+      }
+    }
+
     if (existing.length && !force) return; // already seeded; preserve data
 
     try {

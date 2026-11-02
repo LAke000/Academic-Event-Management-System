@@ -210,6 +210,18 @@ const processQrPayload = (rawText, targetEventId) => {
     return { ok: false, type: "error", message: "Malformed QR payload — missing required fields." };
   }
 
+  // Security hash validation if payload includes registrationHash
+  const rawKey = `${eventId}:${studentId}:${regId}`;
+  let hash = 0;
+  for (let i = 0; i < rawKey.length; i++) {
+    hash = (hash << 5) - hash + rawKey.charCodeAt(i);
+    hash |= 0;
+  }
+  const expectedHash = "H" + Math.abs(hash).toString(16).toUpperCase();
+  if (payload.registrationHash && payload.registrationHash !== expectedHash) {
+    return { ok: false, type: "error", message: "Invalid QR code — security hash mismatch." };
+  }
+
   // Cross-event rejection: ticket belongs to a different event than the target.
   if (targetEventId && eventId !== targetEventId) {
     return {
@@ -284,37 +296,54 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
 
   const raw = query.trim();
 
-  // Route Pasted QR JSON Through processQrPayload in markStudentAttendance
-  if (targetStatus === "Present" && raw.startsWith("{")) {
-    const res = processQrPayload(raw, targetEventId || undefined);
-    if (res.ok) {
-      renderRoster();
-      window.app?.renderDashboardStats?.();
-      window.app?.renderHistory?.();
-      window.RegistrationModule?.renderPasses?.();
-      window.EventsModule?.render?.();
-      window.ReportsModule?.renderCharts?.();
-      window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
-    }
-    return res;
-  }
-
-  const allRegs = StorageService.getRegistrations();
-
   // Support pasting a full QR JSON payload: parse and resolve by regId/eventId/studentId.
   let resolvedRegId = null;
   let resolvedEventId = null;
   let resolvedStudentId = null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.regId && parsed.eventId && parsed.studentId) {
-      resolvedRegId = parsed.regId;
-      resolvedEventId = parsed.eventId;
-      resolvedStudentId = parsed.studentId;
+
+  if (raw.startsWith("{")) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_err) {
+      return { ok: false, type: "error", message: "Invalid QR code — could not parse data." };
     }
-  } catch (_err) {
-    // Not JSON — treat as a plain text query below.
+    if (!parsed || !parsed.regId || !parsed.eventId || !parsed.studentId) {
+      return { ok: false, type: "error", message: "Invalid QR code — could not parse data." };
+    }
+    if (parsed.registrationHash) {
+      const rawKey = `${parsed.eventId}:${parsed.studentId}:${parsed.regId}`;
+      let hash = 0;
+      for (let i = 0; i < rawKey.length; i++) {
+        hash = (hash << 5) - hash + rawKey.charCodeAt(i);
+        hash |= 0;
+      }
+      const expectedHash = "H" + Math.abs(hash).toString(16).toUpperCase();
+      if (parsed.registrationHash !== expectedHash) {
+        return { ok: false, type: "error", message: "Invalid QR code — security hash mismatch." };
+      }
+    }
+    resolvedRegId = parsed.regId;
+    resolvedEventId = parsed.eventId;
+    resolvedStudentId = parsed.studentId;
+
+    // Route Pasted QR JSON Through processQrPayload in markStudentAttendance
+    if (targetStatus === "Present") {
+      const res = processQrPayload(raw, targetEventId || undefined);
+      if (res.ok) {
+        renderRoster();
+        window.app?.renderDashboardStats?.();
+        window.app?.renderHistory?.();
+        window.RegistrationModule?.renderPasses?.();
+        window.EventsModule?.render?.();
+        window.ReportsModule?.renderCharts?.();
+        window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
+      }
+      return res;
+    }
   }
+
+  const allRegs = StorageService.getRegistrations();
 
   // Cross-event rejection for Absent status when JSON contains eventId
   if (targetStatus === "Absent" && resolvedEventId) {
@@ -571,6 +600,8 @@ const stopScanner = async () => {
 const updateScannerUI = (running) => {
   if (btnStartScanner) btnStartScanner.disabled = running;
   if (btnStopScanner) btnStopScanner.disabled = !running;
+  const toggleBtn = document.getElementById("btn-camera-toggle");
+  if (toggleBtn) toggleBtn.disabled = !running;
   if (scannerView) scannerView.hidden = !running;
   if (scannerEmpty) scannerEmpty.hidden = running;
 };

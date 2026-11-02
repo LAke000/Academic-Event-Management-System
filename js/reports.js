@@ -273,7 +273,7 @@ const renderAnalytics = () => {
   }
 
   // ── Bar chart data: Total Registered vs Marked Present per event ──
-  // Both series are derived from live registration records rather than the
+  // All series are derived from live registration records rather than the
   // stored `ev.registered` counter, so the chart always reflects the current
   // registration and check-in state (ECC zero-truncation / data integrity).
   const registeredForEvent = (ev) =>
@@ -284,10 +284,17 @@ const renderAnalytics = () => {
         r.eventId === ev.id &&
         (r.status === "Present" || r.attendance?.status === "Present")
     ).length;
+  const absentForEvent = (ev) =>
+    registrations.filter(
+      (r) =>
+        r.eventId === ev.id &&
+        (r.status === "Absent" || r.attendance?.status === "Absent")
+    ).length;
 
   const eventLabels = scopedEvents.map((ev) => ev.title || ev.id);
   const registeredData = scopedEvents.map(registeredForEvent);
   const presentData = scopedEvents.map(presentForEvent);
+  const absentData = scopedEvents.map(absentForEvent);
 
   // ── Doughnut chart data: registrations grouped by event category (type) ──
   const categoryCounts = {};
@@ -296,14 +303,24 @@ const renderAnalytics = () => {
     const cat = ev?.type || "General";
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
-  const categoryLabels =
-    Object.keys(categoryCounts).length > 0
-      ? Object.keys(categoryCounts)
-      : ["No Registrations"];
-  const categoryData =
-    Object.values(categoryCounts).length > 0
-      ? Object.values(categoryCounts)
-      : [0];
+  const hasCategoryData = Object.keys(categoryCounts).length > 0;
+  const categoryLabels = hasCategoryData
+    ? Object.keys(categoryCounts)
+    : ["No Registrations"];
+  const categoryData = hasCategoryData
+    ? Object.values(categoryCounts)
+    : [1];
+  const categoryColors = hasCategoryData
+    ? [
+        "#1e3a8a",
+        "#059669",
+        "#d97706",
+        "#7c3aed",
+        "#dc2626",
+        "#0891b2",
+        "#be185d",
+      ]
+    : ["#cbd5e1"];
 
   // ── Doughnut chart data: registrations grouped by department ──
   const deptCounts = {};
@@ -311,12 +328,22 @@ const renderAnalytics = () => {
     const dept = r.department || "Unknown";
     deptCounts[dept] = (deptCounts[dept] || 0) + 1;
   });
-  const deptLabels =
-    Object.keys(deptCounts).length > 0
-      ? Object.keys(deptCounts)
-      : ["No Registrations"];
-  const deptData =
-    Object.values(deptCounts).length > 0 ? Object.values(deptCounts) : [0];
+  const hasDeptData = Object.keys(deptCounts).length > 0;
+  const deptLabels = hasDeptData
+    ? Object.keys(deptCounts)
+    : ["No Registrations"];
+  const deptData = hasDeptData ? Object.values(deptCounts) : [1];
+  const deptColors = hasDeptData
+    ? [
+        "#1e3a8a",
+        "#d97706",
+        "#059669",
+        "#7c3aed",
+        "#dc2626",
+        "#0891b2",
+        "#be185d",
+      ]
+    : ["#cbd5e1"];
 
   // ── Destroy prior instances to prevent canvas reuse / memory leaks ──
   destroyChartInstance(ATTENDANCE_CHART_ID);
@@ -347,6 +374,13 @@ const renderAnalytics = () => {
           data: presentData,
           backgroundColor: "#d97706",
           borderColor: "#d97706",
+          borderWidth: 1,
+        },
+        {
+          label: "Marked Absent",
+          data: absentData,
+          backgroundColor: "#dc2626",
+          borderColor: "#dc2626",
           borderWidth: 1,
         },
       ],
@@ -386,15 +420,7 @@ const renderAnalytics = () => {
           {
             label: "Event Category Popularity",
             data: categoryData,
-            backgroundColor: [
-              "#1e3a8a",
-              "#059669",
-              "#d97706",
-              "#7c3aed",
-              "#dc2626",
-              "#0891b2",
-              "#be185d",
-            ],
+            backgroundColor: categoryColors,
             borderColor: "#ffffff",
             borderWidth: 2,
           },
@@ -412,9 +438,11 @@ const renderAnalytics = () => {
           tooltip: {
             callbacks: {
               label: (ctx) =>
-                `${ctx.label}: ${ctx.parsed} registration${
-                  ctx.parsed !== 1 ? "s" : ""
-                }`,
+                ctx.label === "No Registrations"
+                  ? "No Registrations (0)"
+                  : `${ctx.label}: ${ctx.parsed} registration${
+                      ctx.parsed !== 1 ? "s" : ""
+                    }`,
             },
           },
         },
@@ -431,15 +459,7 @@ const renderAnalytics = () => {
         {
           label: "Registrations by Department",
           data: deptData,
-          backgroundColor: [
-            "#1e3a8a",
-            "#d97706",
-            "#059669",
-            "#7c3aed",
-            "#dc2626",
-            "#0891b2",
-            "#be185d",
-          ],
+          backgroundColor: deptColors,
           borderColor: "#ffffff",
           borderWidth: 2,
         },
@@ -456,7 +476,12 @@ const renderAnalytics = () => {
         legend: { position: "right" },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.label}: ${ctx.parsed} registration${ctx.parsed !== 1 ? "s" : ""}`,
+            label: (ctx) =>
+              ctx.label === "No Registrations"
+                ? "No Registrations (0)"
+                : `${ctx.label}: ${ctx.parsed} registration${
+                    ctx.parsed !== 1 ? "s" : ""
+                  }`,
           },
         },
       },

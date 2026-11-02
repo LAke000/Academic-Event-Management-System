@@ -172,11 +172,13 @@ const drawCertificate = (ctx, reg, event) => {
   // ── Department ──
   ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText(
-    `Department: ${event ? event.department : ""} · ${reg.department || ""}`,
-    w / 2,
-    425
-  );
+  const evDept = event ? event.department || "" : "";
+  const stDept = reg.department || "";
+  const deptLine =
+    evDept && stDept && evDept.toLowerCase() !== stDept.toLowerCase()
+      ? `Department: ${evDept} · Attendee Dept: ${stDept}`
+      : `Department: ${evDept || stDept || "—"}`;
+  ctx.fillText(deptLine, w / 2, 425);
 
   // ── Metadata line: Date, Venue, Verification ID ──
   ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";

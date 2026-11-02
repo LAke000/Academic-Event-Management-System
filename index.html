@@ -283,20 +283,21 @@
           <div class="scanner-controls">
             <button class="btn btn-primary" id="btn-start-scanner">Start Camera</button>
             <button class="btn btn-ghost" id="btn-stop-scanner" disabled>Stop Camera</button>
-            <button class="btn btn-ghost" id="btn-camera-toggle">Switch Camera</button>
+            <button class="btn btn-ghost" id="btn-camera-toggle" disabled>Switch Camera</button>
           </div>
         </div>
         <div id="scanner-view" class="scanner-view" hidden>
           <div id="reader" class="reader">Camera feed will appear here</div>
-          <div id="scan-toast" class="scan-toast" hidden>
-            <span class="toast-icon">&#10004;</span>
-            <span class="toast-message" id="scan-toast-message">Checked in successfully</span>
-          </div>
         </div>
         <div id="scanner-empty" class="empty-state" hidden>
           <div class="empty-icon">&#128273;</div>
           <h2>Scanner Not Active</h2>
           <p>Click Start Camera to begin live QR scanning at the venue door.</p>
+        </div>
+
+        <div id="scan-toast" class="scan-toast" hidden>
+          <span class="toast-icon">&#10004;</span>
+          <span class="toast-message" id="scan-toast-message">Checked in successfully</span>
         </div>
 
         <!-- Manual Check-In (moved inline into the scanner tab pane) -->
