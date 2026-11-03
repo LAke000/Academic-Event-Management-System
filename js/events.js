@@ -1152,6 +1152,7 @@ const openRegistrationModal = async (eventId) => {
 // ─── Public API ───────────────────────────────────────────────────────────
 
 const render = () => {
+  populateFilters();
   renderDiscover();
   renderAdminTable();
 };

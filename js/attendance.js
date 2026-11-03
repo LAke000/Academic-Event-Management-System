@@ -502,68 +502,8 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
  * @param {string} query
  * @returns {{ ok: boolean, type: string, message: string }}
  */
-const manualCheckIn = (query) => {
-  if (!query || query.trim() === "") {
-    return { ok: false, type: "error", message: "Please enter a Student ID or Registration ID." };
-  }
-  const term = query.trim();
-  const allRegs = StorageService.getRegistrations();
-  // Match by studentId, regId, or student name (case‑insensitive)
-  const matches = allRegs.filter(
-    (r) =>
-      r.studentId.toLowerCase() === term.toLowerCase() ||
-      r.regId.toLowerCase() === term.toLowerCase() ||
-      (r.name && r.name.toLowerCase() === term.toLowerCase())
-  );
-
-  if (matches.length === 0) {
-    return { ok: false, type: "error", message: `No registration found for "${term}".` };
-  }
-
-  // Check for already‑present duplicates using dual-state consistency
-  const isRegPresent = (r) => r.status === "Present" || r.attendance?.status === "Present";
-  const alreadyPresent = matches.filter(isRegPresent);
-  const pending = matches.filter((r) => !isRegPresent(r));
-
-  if (pending.length === 0) {
-    const firstPresentTs = alreadyPresent[0].checkInTime || alreadyPresent[0].attendance?.checkInTime;
-    const ts = firstPresentTs ? formatDate(firstPresentTs) : "—";
-    return {
-      ok: false,
-      type: "warning",
-      message: `${alreadyPresent[0].name} is already checked in (${ts}). Duplicate override rejected.`,
-    };
-  }
-
-  // Mark all pending registrations
-  const now = new Date().toISOString();
-  let checkedCount = 0;
-  pending.forEach((match) => {
-    const idx = allRegs.findIndex((r) => r.regId === match.regId);
-    if (idx >= 0) {
-      allRegs[idx].status = "Present";
-      allRegs[idx].attendance = { status: "Present", checkInTime: now };
-      allRegs[idx].checkInTime = now;
-      checkedCount++;
-    }
-  });
-  StorageService.saveRegistrations(allRegs);
-  renderLiveCheckinFeed();
-  renderRoster();
-  // Synchronize Student ⇄ Admin state mutations across all views.
-  window.app?.renderDashboardStats?.();
-  window.app?.renderHistory?.();
-  window.RegistrationModule?.renderPasses?.();
-  window.EventsModule?.render?.();
-  window.ReportsModule?.renderCharts?.();
-  window.app?.updateProfileChip?.(StorageService.getActiveRole() || "admin");
-
-  const names = pending.map((r) => r.name).join(", ");
-  return {
-    ok: true,
-    type: "success",
-    message: `✔ ${names} manually checked in (${checkedCount} registration${checkedCount > 1 ? "s" : ""}).`,
-  };
+const manualCheckIn = (query, targetEventId) => {
+  return markStudentAttendance(query, "Present", targetEventId);
 };
 
 // ─── QR Scanner lifecycle ─────────────────────────────────────────────────
@@ -1082,7 +1022,7 @@ const bindEvents = () => {
           await stopScanner();
         }
         const scannerInstance = new Html5Qrcode("reader");
-        const decodedText = await scannerInstance.scanFile(file, true);
+        const decodedText = await scannerInstance.scanFile(file, false);
         try {
           scannerInstance.clear();
         } catch (_e) {}

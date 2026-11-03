@@ -51,16 +51,28 @@
   .dashboard-actions,
   #toast,
   .toast,
+  #toast-container,
   footer,
   nav,
   aside {
     display: none !important;
   }
 
-  .app-layout,
-  main.main-content,
-  #toast-container {
+  /* When printing an open modal (Pass or Certificate), suppress the background app layout */
+  body:has(dialog[open]) .app-layout,
+  body:has(dialog[open]) main.main-content {
     display: none !important;
+  }
+
+  /* When printing from the main page directly (e.g. Roster or Reports), format main content cleanly */
+  body:not(:has(dialog[open])) .app-layout {
+    display: block !important;
+  }
+  body:not(:has(dialog[open])) main.main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background-color: #ffffff !important;
   }
 
   .pass-layout,

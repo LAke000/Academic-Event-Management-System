@@ -87,6 +87,10 @@
   gap: var(--space-xs);
 }
 
+.event-card-meta .meta-row.description-row {
+  align-items: flex-start;
+}
+
 .event-card-meta .meta-icon {
   width: 16px;
   font-size: var(--font-sm);
@@ -155,8 +159,11 @@
 .status-badge.housefull,
 .status-badge.absent,
 .status-badge--absent,
+.status-badge.cancelled,
+.status-badge--cancelled,
 .status-badge.bg-danger,
 .pass-badge.absent,
+.pass-badge.cancelled,
 .badge--absent,
 .badge.bg-danger {
   background-color: var(--status-absent-bg);

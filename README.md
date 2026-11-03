@@ -171,7 +171,7 @@ Only three external libraries are loaded via CDN, all vanilla-compatible:
 
 | Library | Purpose | CDN |
 |---|---|---|
-| `qrcode.min.js` | Generates the student's unique digital QR entry pass | `https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js` |
+| `qrcode.min.js` | Generates the student's unique digital QR entry pass | `[https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js](https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js)` |
 | `html5-qrcode.min.js` | Accesses the device webcam to scan student QR codes live at the venue door | `https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8` |
 | `Chart.js` | Renders attendance and turnout analytics in the Reports section | `https://cdn.jsdelivr.net/npm/chart.js` |
 

@@ -163,11 +163,20 @@ const openRegistrationModal = (eventId) => {
   if (activeStudentId && activeStudentId !== "ALL" && !activeAlreadyInEvent) {
     const regs = StorageService.getRegistrations();
     const existing = regs.find((r) => r.studentId === activeStudentId);
+    const known = typeof StorageService.getKnownStudents === "function"
+      ? StorageService.getKnownStudents().find((s) => s.studentId === activeStudentId)
+      : null;
+
     if (existing) {
       fieldName.value = existing.name || "";
       fieldStudentId.value = existing.studentId || "";
       fieldEmail.value = existing.email || "";
       fieldDepartment.value = existing.department || "";
+    } else if (known) {
+      fieldName.value = known.name || "";
+      fieldStudentId.value = known.studentId || "";
+      fieldEmail.value = known.email || "";
+      fieldDepartment.value = known.department || "";
     } else {
       fieldStudentId.value = activeStudentId;
     }
@@ -240,6 +249,10 @@ const handleRegistrationSubmit = (event) => {
   const ev = StorageService.getEventById(eventId);
   if (!ev) {
     showRegFormError("Event not found.");
+    return;
+  }
+  if (ev.status === "Cancelled") {
+    showRegFormError("Cannot register: This event has been cancelled.");
     return;
   }
   if (existingRegs.length >= (ev.capacity || 0)) {
@@ -417,6 +430,11 @@ const renderPassCard = (reg) => {
   const isPresent = !isCancelled && statusVal === "Present";
   const isAbsent = !isCancelled && statusVal === "Absent";
 
+  const feedbacks = StorageService.getFeedback();
+  const feedbackSubmitted = feedbacks.some(
+    (f) => f.eventId === reg.eventId && f.studentId === reg.studentId
+  );
+
   card.innerHTML = `
     <div class="pass-card-header">
       ${escapeHtml(event ? event.title : "Unknown Event")}
@@ -437,7 +455,9 @@ const renderPassCard = (reg) => {
         : isPresent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Attendance already marked present.">Attendance Locked</button>
            <button class="btn btn-outline btn-sm btn-download-cert" data-regid="${escapeHtml(reg.regId)}">Download Certificate</button>
-           <button class="btn btn-outline btn-sm btn-submit-feedback" data-regid="${escapeHtml(reg.regId)}" data-eventid="${escapeHtml(reg.eventId)}" data-studentid="${escapeHtml(reg.studentId)}">Submit Feedback</button>
+           ${feedbackSubmitted
+             ? `<span class="status-badge status-badge--present">Feedback Submitted ✓</span>`
+             : `<button class="btn btn-outline btn-sm btn-submit-feedback" data-regid="${escapeHtml(reg.regId)}" data-eventid="${escapeHtml(reg.eventId)}" data-studentid="${escapeHtml(reg.studentId)}">Submit Feedback</button>`}
            <button class="btn btn-primary btn-view-qr" data-regid="${escapeHtml(reg.regId)}">View QR Ticket</button>`
         : isAbsent
         ? `<button class="btn btn-ghost btn-sm" disabled title="Marked Absent — Certificate & Feedback Locked">Marked Absent (Locked)</button>
