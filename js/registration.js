@@ -146,8 +146,8 @@ const openRegistrationModal = (eventId) => {
     window.showToast("Event not found.", "error");
     return;
   }
-  fieldEventId.value = eventId;
   form.reset();
+  fieldEventId.value = eventId;
 
   // Pre-fill form fields from the active student profile when it matches an
   // existing student record (still allowing the user to type different details),
@@ -232,10 +232,13 @@ const handleRegistrationSubmit = (event) => {
 
   // Duplicate gate — block duplicate Roll Number AND duplicate Email (case-insensitive)
   const existingRegs = StorageService.getRegistrationsByEvent(eventId);
-  const dupRoll = existingRegs.some(
+  const activeRegs = existingRegs.filter(
+    (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+  );
+  const dupRoll = activeRegs.some(
     (r) => (r.studentId || "").toLowerCase() === studentId.toLowerCase()
   );
-  const dupEmail = existingRegs.some(
+  const dupEmail = activeRegs.some(
     (r) => (r.email || "").toLowerCase() === email.toLowerCase()
   );
   if (dupRoll || dupEmail) {

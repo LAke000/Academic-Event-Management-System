@@ -241,8 +241,11 @@ const matchesSearch = (event, query) => {
 };
 
 const eventHasSeats = (event) => {
-  const registrations = StorageService.getRegistrationsByEvent(event.id);
-  return registrations.length < (event.capacity || 0);
+  if (event.status === "Cancelled") return false;
+  const registrations = StorageService.getRegistrationsByEvent(event.id).filter(
+    (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+  );
+  return registrations.length < (Number(event.capacity) || 0);
 };
 
 const eventMatchesDate = (event, dateStr) => {
@@ -374,6 +377,8 @@ const renderDiscover = () => {
     const isAbsent =
       activeReg &&
       (activeReg.status === "Absent" || activeReg.attendance?.status === "Absent");
+    const isEventCancelled =
+      event.status === "Cancelled" || activeReg?.status === "Cancelled";
 
     const card = document.createElement("div");
     card.className = "event-card";
@@ -416,11 +421,13 @@ const renderDiscover = () => {
         </div>
         <div class="event-card-footer" style="display:flex; gap: var(--space-xs); flex-wrap: wrap; align-items: center;">
           ${alreadyRegistered
-            ? `<span class="status-badge registered">Registered ✓</span>
-               <button class="btn btn-ghost btn-sm btn-view-my-pass" data-id="${event.id}" data-regid="${activeReg.regId}">View My Pass</button>
-               ${!isPresent && !isAbsent
-                 ? `<button class="btn btn-outline btn-sm btn-card-drop-seat" data-regid="${activeReg.regId}">Drop Seat</button>`
-                 : ""}`
+            ? isEventCancelled
+              ? `<span class="status-badge bg-danger">Registration Void (Cancelled)</span>`
+              : `<span class="status-badge registered">Registered ✓</span>
+                 <button class="btn btn-ghost btn-sm btn-view-my-pass" data-id="${event.id}" data-regid="${activeReg.regId}">View My Pass</button>
+                 ${!isPresent && !isAbsent
+                   ? `<button class="btn btn-outline btn-sm btn-card-drop-seat" data-regid="${activeReg.regId}">Drop Seat</button>`
+                   : ""}`
             : ""
           }
           <button class="btn ${alreadyRegistered ? "btn-outline btn-sm" : "btn-primary"} btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>

@@ -720,6 +720,10 @@ const ensureFilterToolbar = () => {
   absentOpt.value = "Absent";
   absentOpt.textContent = "Absent";
   statusSelect.appendChild(absentOpt);
+  const cancelledOpt = document.createElement("option");
+  cancelledOpt.value = "Cancelled";
+  cancelledOpt.textContent = "Cancelled";
+  statusSelect.appendChild(cancelledOpt);
 
   toolbar.appendChild(searchLabel);
   toolbar.appendChild(searchInput);
@@ -765,10 +769,16 @@ const applyRosterFilters = (regs) => {
     if (eventId && reg.eventId !== eventId) return false;
     // Dual-state consistency: check both top-level and nested attendance status
     if (status) {
-      const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
-      const isAbsent = reg.status === "Absent" || reg.attendance?.status === "Absent";
+      const ev = StorageService.getEventById(reg.eventId);
+      const isCancelled =
+        reg.status === "Cancelled" ||
+        reg.attendance?.status === "Cancelled" ||
+        ev?.status === "Cancelled";
+      const isPresent = !isCancelled && (reg.status === "Present" || reg.attendance?.status === "Present");
+      const isAbsent = !isCancelled && (reg.status === "Absent" || reg.attendance?.status === "Absent");
       let effectiveStatus;
-      if (isPresent) effectiveStatus = "Present";
+      if (isCancelled) effectiveStatus = "Cancelled";
+      else if (isPresent) effectiveStatus = "Present";
       else if (isAbsent) effectiveStatus = "Absent";
       else effectiveStatus = "Registered";
       if (effectiveStatus !== status) return false;
@@ -879,13 +889,28 @@ const renderRoster = () => {
   regs.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
     // Dual-state consistency: check both top-level and nested attendance status
-    const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
-    const isAbsent = reg.status === "Absent" || reg.attendance?.status === "Absent";
+    const isCancelled =
+      reg.status === "Cancelled" ||
+      reg.attendance?.status === "Cancelled" ||
+      event?.status === "Cancelled";
+    const isPresent = !isCancelled && (reg.status === "Present" || reg.attendance?.status === "Present");
+    const isAbsent = !isCancelled && (reg.status === "Absent" || reg.attendance?.status === "Absent");
     const registeredAt = reg.registeredAt || reg.timestamp || "—";
     const registeredAtDisplay =
       registeredAt !== "—" ? formatDate(registeredAt) : "—";
     const ts = reg.checkInTime || reg.attendance?.checkInTime;
     const checkInDisplay = ts ? formatDate(ts) : "—";
+
+    const statusBadge = isCancelled
+      ? `<span class="badge badge--absent">Cancelled</span>`
+      : `<span class="badge ${isPresent ? "badge--success" : isAbsent ? "badge--absent" : "badge--warning"}">${isPresent ? "Present" : isAbsent ? "Absent" : "Registered"}</span>`;
+
+    const actionsHtml = isCancelled
+      ? `<span style="color: var(--status-housefull); font-size: var(--font-xs); font-weight: 600;">Cancelled (Void)</span>`
+      : `<div style="display:flex; gap: var(--space-xs); flex-wrap: wrap;">
+           <button class="btn btn-sm ${isPresent ? "btn-ghost" : "btn-primary"} btn-mark-present" data-regid="${reg.regId}" ${isPresent ? "disabled" : ""}>${isPresent ? "Present ✓" : "Mark Present"}</button>
+           <button class="btn btn-sm ${isAbsent ? "btn-ghost" : "btn-danger"} btn-mark-absent" data-regid="${reg.regId}" ${isAbsent ? "disabled" : ""}>${isAbsent ? "Absent ✗" : "Mark Absent"}</button>
+         </div>`;
 
     const tr = document.createElement("tr");
     tr.innerHTML =
@@ -895,14 +920,9 @@ const renderRoster = () => {
       `<td>${event ? escapeHtml(event.title) : reg.eventId}</td>` +
       `<td>${escapeHtml(reg.email)}</td>` +
       `<td>${registeredAtDisplay}</td>` +
-      `<td><span class="badge ${isPresent ? "badge--success" : isAbsent ? "badge--absent" : "badge--warning"}">${isPresent ? "Present" : isAbsent ? "Absent" : "Registered"}</span></td>` +
+      `<td>${statusBadge}</td>` +
       `<td>${checkInDisplay}</td>` +
-      `<td>` +
-        `<div style="display:flex; gap: var(--space-xs); flex-wrap: wrap;">` +
-          `<button class="btn btn-sm ${isPresent ? "btn-ghost" : "btn-primary"} btn-mark-present" data-regid="${reg.regId}" ${isPresent ? "disabled" : ""}>${isPresent ? "Present ✓" : "Mark Present"}</button>` +
-          `<button class="btn btn-sm ${isAbsent ? "btn-ghost" : "btn-danger"} btn-mark-absent" data-regid="${reg.regId}" ${isAbsent ? "disabled" : ""}>${isAbsent ? "Absent ✗" : "Mark Absent"}</button>` +
-        `</div>` +
-      `</td>`;
+      `<td>${actionsHtml}</td>`;
     rosterTableBody.appendChild(tr);
   });
 

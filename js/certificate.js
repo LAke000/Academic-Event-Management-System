@@ -318,7 +318,7 @@ const printCertificate = () => {
   const dataUrl = canvas.toDataURL("image/png");
   const printWin = window.open("", "_blank");
   if (!printWin) {
-    window.showToast("Popup blocked — please allow popups to print.", "error");
+    window.print();
     return;
   }
   printWin.document.write(

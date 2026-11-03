@@ -254,3 +254,73 @@ test("handleRegistrationSubmit blocks registration for cancelled events", () => 
   const regs = JSON.parse(store["academic_registrations_db"] || "[]");
   assert.equal(regs.length, 0, "No registration should be created for a cancelled event");
 });
+
+test("openRegistrationModal preserves eventId even when form.reset() clears form", () => {
+  store["academic_events_db"] = JSON.stringify([
+    {
+      id: "ev-test-reset",
+      title: "Reset Order Test Event",
+      date: new Date(Date.now() + 86400000).toISOString(),
+      capacity: 50,
+      status: "Open",
+    },
+  ]);
+  // Set a mock reset on registration-form that clears reg-event-id
+  mockElements["registration-form"].reset = () => {
+    mockElements["reg-event-id"].value = "";
+    mockElements["reg-student-name"].value = "";
+  };
+
+  RegistrationModule.openRegistrationModal("ev-test-reset");
+  assert.equal(
+    mockElements["reg-event-id"].value,
+    "ev-test-reset",
+    "fieldEventId must be set after form.reset() so eventId is preserved"
+  );
+});
+
+test("handleRegistrationSubmit permits re-registration if prior registration was cancelled", () => {
+  store["academic_events_db"] = JSON.stringify([
+    {
+      id: "ev-reregister",
+      title: "Re-registration Event",
+      date: new Date(Date.now() + 86400000).toISOString(),
+      capacity: 50,
+      status: "Open",
+    },
+  ]);
+  // An existing registration exists for this student, but it is Cancelled
+  store["academic_registrations_db"] = JSON.stringify([
+    {
+      regId: "REG-OLD",
+      eventId: "ev-reregister",
+      studentId: "12345678",
+      name: "Dave Test",
+      email: "dave@example.edu",
+      department: "CS",
+      status: "Cancelled",
+      attendance: { status: "Cancelled" },
+    },
+  ]);
+
+  mockElements["reg-event-id"].value = "ev-reregister";
+  mockElements["reg-student-name"].value = "Dave Test";
+  mockElements["reg-student-id"].value = "12345678";
+  mockElements["reg-email"].value = "dave@example.edu";
+  mockElements["reg-department"].value = "CS";
+
+  let prevented = false;
+  RegistrationModule.handleRegistrationSubmit({
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(mockElements["reg-form-error"].textContent, "", "Should not show duplicate error for cancelled registration");
+  const regs = JSON.parse(store["academic_registrations_db"] || "[]");
+  assert.equal(regs.length, 2, "A new active registration should be saved alongside cancelled record");
+  const newReg = regs.find((r) => r.regId !== "REG-OLD");
+  assert.ok(newReg, "New registration should exist");
+  assert.equal(newReg.status, "Registered");
+});

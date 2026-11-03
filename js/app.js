@@ -338,12 +338,11 @@ const updateProfileChip = (role) => {
     let studentName = "";
     let count = 0;
 
+    const studentRegs = activeId === "ALL" ? [] : regs.filter((r) => r.studentId === activeId);
+
     if (activeId === "ALL") {
       studentName = "All Students View";
-      count = regs.length;
     } else {
-      const studentRegs = regs.filter((r) => r.studentId === activeId);
-      count = studentRegs.length;
       const firstReg = studentRegs[0] || regs.find((r) => r.studentId === activeId);
       const known = typeof StorageService.getKnownStudents === "function"
         ? StorageService.getKnownStudents().find((s) => s.studentId === activeId)
@@ -356,6 +355,11 @@ const updateProfileChip = (role) => {
         studentName = `Student (${activeId})`;
       }
     }
+
+    const activeRegs = (activeId === "ALL" ? regs : studentRegs).filter(
+      (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+    );
+    count = activeRegs.length;
 
     if (chipName) chipName.textContent = studentName;
     if (chipAvatar) {

@@ -282,6 +282,9 @@ const FeedbackModule = (() => {
       window.showToast("Thank you! Your feedback has been submitted.", "success");
     }
 
+    // Refresh student passes so Feedback Submitted badge renders immediately
+    window.RegistrationModule?.renderPasses?.();
+
     // Refresh admin dashboard if visible
     renderAdminDashboard();
 
