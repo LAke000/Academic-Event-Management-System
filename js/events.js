@@ -58,6 +58,11 @@ resolveRefs();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const getActiveRegistrationsByEvent = (eventId) =>
+  StorageService.getRegistrationsByEvent(eventId).filter(
+    (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+  );
+
 const escapeHtml = (str) => {
   if (typeof str !== "string") return "";
   const div = document.createElement("div");
@@ -131,16 +136,12 @@ const ensureDiscoverControls = () => {
 
   const bar = document.createElement("div");
   bar.className = "discover-controls";
-  bar.style.cssText =
-    "display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: flex-end; margin-bottom: var(--space-lg);";
 
   if (needsSearch) {
     const input = document.createElement("input");
     input.type = "text";
     input.id = "event-search-input";
     input.placeholder = "Search events by title, speaker, department, venue…";
-    input.style.cssText =
-      "flex: 1; min-width: 220px; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); background: var(--color-surface); color: var(--color-text-primary);";
     bar.appendChild(input);
   }
 
@@ -148,8 +149,6 @@ const ensureDiscoverControls = () => {
     const select = document.createElement("select");
     select.id = "dept-filter-select";
     select.innerHTML = '<option value="">All Departments</option>';
-    select.style.cssText =
-      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 180px; background: var(--color-surface); color: var(--color-text-primary);";
     bar.appendChild(select);
   }
 
@@ -164,8 +163,6 @@ const ensureDiscoverControls = () => {
       '<option value="Guest Lecture">Guest Lecture</option>' +
       '<option value="Hackathon">Hackathon</option>' +
       '<option value="Symposium">Symposium</option>';
-    select.style.cssText =
-      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 180px; background: var(--color-surface); color: var(--color-text-primary);";
     bar.appendChild(select);
   }
 
@@ -176,8 +173,6 @@ const ensureDiscoverControls = () => {
       '<option value="">Availability</option>' +
       '<option value="available">Seats Available</option>' +
       '<option value="full">Housefull</option>';
-    select.style.cssText =
-      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 170px; background: var(--color-surface); color: var(--color-text-primary);";
     bar.appendChild(select);
   }
 
@@ -186,8 +181,6 @@ const ensureDiscoverControls = () => {
     input.type = "date";
     input.id = "date-filter-input";
     input.placeholder = "Filter by date";
-    input.style.cssText =
-      "padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-sm); min-width: 170px; background: var(--color-surface); color: var(--color-text-primary);";
     bar.appendChild(input);
   }
 
@@ -197,7 +190,6 @@ const ensureDiscoverControls = () => {
     btn.id = "btn-reset-filters";
     btn.className = "btn btn-ghost btn-sm";
     btn.textContent = "Reset Filters";
-    btn.style.cssText = "align-self: flex-end;";
     btn.addEventListener("click", () => resetFilters());
     bar.appendChild(btn);
   }
@@ -242,9 +234,7 @@ const matchesSearch = (event, query) => {
 
 const eventHasSeats = (event) => {
   if (event.status === "Cancelled") return false;
-  const registrations = StorageService.getRegistrationsByEvent(event.id).filter(
-    (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
-  );
+  const registrations = getActiveRegistrationsByEvent(event.id);
   return registrations.length < (Number(event.capacity) || 0);
 };
 
@@ -318,7 +308,8 @@ const renderDiscover = () => {
 
   const upcomingReminders = reminders.filter(
     (rem) => new Date(rem.sentAt) <= new Date() &&
-      (activeStudentId === "ALL" || !activeStudentId || registeredEventIds.has(rem.eventId))
+      (activeStudentId === "ALL" || !activeStudentId || registeredEventIds.has(rem.eventId)) &&
+      StorageService.getEventById(rem.eventId)?.status !== "Cancelled"
   );
 
   if (bannerEl) {
@@ -356,7 +347,8 @@ const renderDiscover = () => {
   }
 
   filtered.forEach((event) => {
-    const registrations = StorageService.getRegistrationsByEvent(event.id);
+    const allEventRegs = StorageService.getRegistrationsByEvent(event.id);
+    const registrations = getActiveRegistrationsByEvent(event.id);
     const registeredCount = registrations.length;
     const capacity = Number(event.capacity) || 0;
     const fillPercent =
@@ -368,7 +360,7 @@ const renderDiscover = () => {
     const activeStudentId = StorageService.getActiveStudentId();
     const activeReg =
       activeStudentId && activeStudentId !== "ALL"
-        ? registrations.find((r) => r.studentId === activeStudentId)
+        ? allEventRegs.find((r) => r.studentId === activeStudentId)
         : null;
     const alreadyRegistered = Boolean(activeReg);
     const isPresent =
@@ -378,7 +370,9 @@ const renderDiscover = () => {
       activeReg &&
       (activeReg.status === "Absent" || activeReg.attendance?.status === "Absent");
     const isEventCancelled =
-      event.status === "Cancelled" || activeReg?.status === "Cancelled";
+      event.status === "Cancelled" ||
+      activeReg?.status === "Cancelled" ||
+      activeReg?.attendance?.status === "Cancelled";
 
     const card = document.createElement("div");
     card.className = "event-card";
@@ -430,10 +424,10 @@ const renderDiscover = () => {
                    : ""}`
             : ""
           }
-          <button class="btn ${alreadyRegistered ? "btn-outline btn-sm" : "btn-primary"} btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
+          <button class="btn ${alreadyRegistered && !isEventCancelled ? "btn-outline btn-sm" : "btn-primary"} btn-register" data-id="${event.id}" ${isClosed ? "disabled" : ""}>
             ${isClosed
               ? (lifecycle.reason || "Closed")
-              : alreadyRegistered
+              : (alreadyRegistered && !isEventCancelled)
               ? "Register Another Student"
               : "Register Now"}
           </button>
@@ -578,7 +572,7 @@ const renderAdminTable = () => {
   if (eventsList) eventsList.hidden = false;
 
   events.forEach((ev) => {
-    const registrations = StorageService.getRegistrationsByEvent(ev.id);
+    const registrations = getActiveRegistrationsByEvent(ev.id);
     const registeredCount = registrations.length;
     const capacity = Number(ev.capacity) || 0;
     const lifecycle = computeEventLifecycle(ev, registeredCount);
@@ -597,7 +591,7 @@ const renderAdminTable = () => {
         <button class="btn btn-sm btn-outline btn-edit-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Edit</button>
         <button class="btn btn-sm btn-outline btn-cancel-ev" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);" ${ev.status === "Cancelled" ? "disabled" : ""}>Cancel</button>
         <button class="btn btn-sm btn-ghost btn-view-roster" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Roster</button>
-        <button class="btn btn-sm btn-ghost btn-remind-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Remind</button>
+        <button class="btn btn-sm btn-ghost btn-remind-event" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);" ${ev.status === "Cancelled" ? "disabled" : ""}>Remind</button>
         <button class="btn btn-sm btn-danger btn-delete" data-id="${ev.id}" style="padding: var(--space-xs) var(--space-sm); font-size: var(--font-xs);">Delete</button>
       </td>
     `;
@@ -654,7 +648,7 @@ const cancelEvent = (eventId) => {
 
   const events = StorageService.getEvents().map((ev) => {
     if (ev.id === eventId) {
-      return { ...ev, status: "Cancelled" };
+      return { ...ev, status: "Cancelled", registered: 0 };
     }
     return ev;
   });
@@ -727,6 +721,10 @@ const sendReminder = (eventId) => {
   const event = StorageService.getEventById(eventId);
   if (!event) {
     window.showToast("Event not found.", "error");
+    return;
+  }
+  if (event.status === "Cancelled") {
+    window.showToast("Cannot send reminders for a cancelled event.", "error");
     return;
   }
 
@@ -994,7 +992,7 @@ const initCreateEventModal = () => {
 
     // Compute the actual registration count so status reflects reality
     const currentRegCount = editingEventId
-      ? StorageService.getRegistrationsByEvent(editingEventId).length
+      ? getActiveRegistrationsByEvent(editingEventId).length
       : 0;
 
     // Validation: when editing, capacity cannot drop below current registrations.
@@ -1187,6 +1185,8 @@ const EventsModule = {
   openRegistrationModal,
   deleteEvent,
   cancelEvent,
+  eventHasSeats,
+  getActiveRegistrationsByEvent,
 };
 
 export default EventsModule;

@@ -234,14 +234,17 @@ const renderAnalytics = () => {
   // Render KPI grid cards (scoped to filter if selected)
   const totalEvents = scopedEvents.length;
   const totalRegs = scopedRegistrations.length;
-  const checkedIn = scopedRegistrations.filter(
+  const activeScopedRegs = scopedRegistrations.filter(
+    (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+  );
+  const checkedIn = activeScopedRegs.filter(
     (r) => r.status === "Present" || r.attendance?.status === "Present"
   ).length;
   const turnoutRate =
-    totalRegs > 0 ? Math.round((checkedIn / totalRegs) * 100) + "%" : "0%";
+    activeScopedRegs.length > 0 ? Math.round((checkedIn / activeScopedRegs.length) * 100) + "%" : "0%";
   const noshowRate =
-    totalRegs > 0
-      ? Math.round(((totalRegs - checkedIn) / totalRegs) * 100) + "%"
+    activeScopedRegs.length > 0
+      ? Math.round(((activeScopedRegs.length - checkedIn) / activeScopedRegs.length) * 100) + "%"
       : "0%";
   const avgRating =
     scopedFeedbacks.length > 0

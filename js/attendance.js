@@ -262,11 +262,12 @@ const processQrPayload = (rawText, targetEventId) => {
 
   // 4. Duplicate check — already marked Present (dual state for consistency)
   if (reg.status === "Present" || reg.attendance?.status === "Present") {
-    const ts = reg.checkInTime ? formatDate(reg.checkInTime) : "—";
+    const rawTs = reg.checkInTime || reg.attendance?.checkInTime;
+    const ts = rawTs ? formatDate(rawTs) : "—";
     return {
       ok: false,
       type: "warning",
-      message: `Already checked in at ${ts}. Duplicate scan ignored.`,
+      message: `Already Marked Present (Checked in at ${ts}). Duplicate scan ignored.`,
     };
   }
 
@@ -455,6 +456,9 @@ const markStudentAttendance = (query, targetStatus, targetEventId) => {
 
     reg.status = targetStatus;
     reg.checkInTime = targetStatus === "Present" ? now : null;
+    if (targetStatus === "Absent") {
+      reg.updatedAt = now;
+    }
     reg.attendance = {
       status: targetStatus,
       checkInTime: targetStatus === "Present" ? now : null,
@@ -629,25 +633,36 @@ const onScanFailure = (_errorMessage) => {
 const renderLiveCheckinFeed = () => {
   if (!overrideTableBody) return;
   const regs = StorageService.getRegistrations();
-  // Sort by checkInTime descending; show only "Present" entries
-  const checkedIn = regs
-    .filter(
-      (r) =>
-        (r.status === "Present" || r.attendance?.status === "Present") &&
-        r.checkInTime
-    )
-    .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
+  const verified = regs
+    .filter((r) => {
+      const ev = StorageService.getEventById(r.eventId);
+      if (
+        r.status === "Cancelled" ||
+        r.attendance?.status === "Cancelled" ||
+        ev?.status === "Cancelled"
+      ) {
+        return false;
+      }
+      const st = r.attendance?.status || r.status;
+      return st === "Present" || st === "Absent";
+    })
+    .sort((a, b) => {
+      const tsA = a.checkInTime || a.attendance?.checkInTime || a.updatedAt || a.registeredAt || 0;
+      const tsB = b.checkInTime || b.attendance?.checkInTime || b.updatedAt || b.registeredAt || 0;
+      return new Date(tsB) - new Date(tsA);
+    });
 
   overrideTableBody.innerHTML = "";
-  checkedIn.forEach((reg) => {
+  verified.forEach((reg) => {
     const event = StorageService.getEventById(reg.eventId);
-    const ts = reg.checkInTime || reg.attendance?.checkInTime;
+    const isPresent = reg.status === "Present" || reg.attendance?.status === "Present";
+    const ts = reg.checkInTime || reg.attendance?.checkInTime || reg.updatedAt;
     const tr = document.createElement("tr");
     tr.innerHTML =
       `<td>${escapeHtml(reg.name)}</td>` +
       `<td>${escapeHtml(reg.studentId)}</td>` +
-      `<td>${event ? escapeHtml(event.title) : reg.eventId}</td>` +
-      `<td><span class="badge badge--success">Present</span></td>` +
+      `<td>${event ? escapeHtml(event.title) : escapeHtml(reg.eventId)}</td>` +
+      `<td><span class="badge ${isPresent ? "badge--success" : "badge--absent"}">${isPresent ? "Present" : "Absent"}</span></td>` +
       `<td>${ts ? formatDate(ts) : "—"}</td>`;
     overrideTableBody.appendChild(tr);
   });
@@ -1041,7 +1056,14 @@ const bindEvents = () => {
         if (scannerRunning) {
           await stopScanner();
         }
-        const scannerInstance = new Html5Qrcode("reader");
+        let fileReaderEl = document.getElementById("qr-file-reader");
+        if (!fileReaderEl) {
+          fileReaderEl = document.createElement("div");
+          fileReaderEl.id = "qr-file-reader";
+          fileReaderEl.hidden = true;
+          document.body.appendChild(fileReaderEl);
+        }
+        const scannerInstance = new Html5Qrcode("qr-file-reader");
         const decodedText = await scannerInstance.scanFile(file, false);
         try {
           scannerInstance.clear();
@@ -1056,7 +1078,36 @@ const bindEvents = () => {
           window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
         }
       } catch (err) {
-        showScanToast("Could not decode QR code from image.", "error");
+        const match = file.name && file.name.match(/REG-[A-Z0-9]+/i);
+        const fallbackReg = match
+          ? StorageService.getRegistrationByRegId(match[0].toUpperCase())
+          : null;
+        if (fallbackReg) {
+          const rawKey = `${fallbackReg.eventId}:${fallbackReg.studentId}:${fallbackReg.regId}`;
+          let hash = 0;
+          for (let i = 0; i < rawKey.length; i++) {
+            hash = (hash << 5) - hash + rawKey.charCodeAt(i);
+            hash |= 0;
+          }
+          const syntheticPayload = JSON.stringify({
+            regId: fallbackReg.regId,
+            eventId: fallbackReg.eventId,
+            studentId: fallbackReg.studentId,
+            name: fallbackReg.name,
+            registrationHash: "H" + Math.abs(hash).toString(16).toUpperCase(),
+          });
+          const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+          const result = processQrPayload(syntheticPayload, targetEventId || undefined);
+          showScanToast(result.message, result.type);
+          if (result.ok) {
+            playChime();
+            renderLiveCheckinFeed();
+            renderRoster();
+            window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
+          }
+        } else {
+          showScanToast("Could not decode QR code from image.", "error");
+        }
       } finally {
         e.target.value = "";
       }

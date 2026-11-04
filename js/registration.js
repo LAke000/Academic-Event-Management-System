@@ -27,6 +27,12 @@ const REGISTRATION_MARKUP = `
       <div id="reg-form-error" role="alert" hidden style="padding: 10px 12px; margin-bottom: 12px; border-radius: 6px; background: #fee2e2; color: #b91c1c; font-size: 0.875rem; font-weight: 500;"></div>
       <input type="hidden" name="eventId" id="reg-event-id">
       <div class="form-field">
+        <label class="form-label" for="reg-student-preset">Quick-Fill Known Student (Optional)</label>
+        <select id="reg-student-preset" class="filter-select">
+          <option value="">-- Type New Student or Select Demo Profile --</option>
+        </select>
+      </div>
+      <div class="form-field">
         <label class="form-label" for="reg-student-name">Student Name</label>
         <input type="text" id="reg-student-name" name="name" required placeholder="e.g. Alice Kumar" maxlength="100">
       </div>
@@ -61,6 +67,7 @@ if (typeof document !== "undefined" && !document.getElementById(DIALOG_ID)) {
 const dialogEl = document.getElementById(DIALOG_ID);
 const form = document.getElementById(FORM_ID);
 const fieldEventId = document.getElementById("reg-event-id");
+const fieldStudentPreset = document.getElementById("reg-student-preset");
 const fieldName = document.getElementById("reg-student-name");
 const fieldStudentId = document.getElementById("reg-student-id");
 const fieldEmail = document.getElementById("reg-email");
@@ -132,6 +139,26 @@ const clearRegFormError = () => {
   }
 };
 
+/**
+ * Populate the quick-fill known student preset dropdown from StorageService.
+ * @param {string} selectedId - Student ID to mark selected
+ */
+const populateRegPresetSelect = (selectedId = "") => {
+  const presetSelect = document.getElementById("reg-student-preset") || fieldStudentPreset;
+  if (!presetSelect) return;
+  presetSelect.innerHTML = '<option value="">-- Type New Student or Select Demo Profile --</option>';
+  const students = typeof StorageService.getKnownStudents === "function"
+    ? StorageService.getKnownStudents()
+    : [];
+  students.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.studentId;
+    opt.textContent = `${s.name || "Student"} (${s.studentId})`;
+    presetSelect.appendChild(opt);
+  });
+  presetSelect.value = selectedId || "";
+};
+
 // ─── Registration flow ────────────────────────────────────────────────────
 
 /**
@@ -160,6 +187,7 @@ const openRegistrationModal = (eventId) => {
     activeStudentId !== "ALL" &&
     eventRegs.some((r) => r.studentId === activeStudentId);
 
+  let selectedPresetId = "";
   if (activeStudentId && activeStudentId !== "ALL" && !activeAlreadyInEvent) {
     const regs = StorageService.getRegistrations();
     const existing = regs.find((r) => r.studentId === activeStudentId);
@@ -172,15 +200,20 @@ const openRegistrationModal = (eventId) => {
       fieldStudentId.value = existing.studentId || "";
       fieldEmail.value = existing.email || "";
       fieldDepartment.value = existing.department || "";
+      selectedPresetId = existing.studentId || activeStudentId;
     } else if (known) {
       fieldName.value = known.name || "";
       fieldStudentId.value = known.studentId || "";
       fieldEmail.value = known.email || "";
       fieldDepartment.value = known.department || "";
+      selectedPresetId = known.studentId || activeStudentId;
     } else {
       fieldStudentId.value = activeStudentId;
+      selectedPresetId = activeStudentId;
     }
   }
+
+  populateRegPresetSelect(selectedPresetId);
 
   if (dialogEl && typeof dialogEl.showModal === "function") {
     dialogEl.showModal();
@@ -205,7 +238,9 @@ const validateRegistration = (name, studentId, email, department) => {
   if (!name || name.trim() === "") return "Student Name is required.";
   if (!studentId || studentId.trim() === "") return "Student ID / Roll No. is required.";
   if (!email || email.trim() === "") return "University Email is required.";
-  if (!email.includes("@")) return "Please enter a valid University Email containing '@'.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return "Please enter a valid University Email (e.g. name@university.edu).";
+  }
   if (!department || department.trim() === "") return "Department is required.";
   return null;
 };
@@ -258,7 +293,7 @@ const handleRegistrationSubmit = (event) => {
     showRegFormError("Cannot register: This event has been cancelled.");
     return;
   }
-  if (existingRegs.length >= (ev.capacity || 0)) {
+  if (activeRegs.length >= (Number(ev.capacity) || 0)) {
     showRegFormError("Event is at full capacity.");
     return;
   }
@@ -312,7 +347,7 @@ const handleRegistrationSubmit = (event) => {
   const allEvents = StorageService.getEvents();
   const evIdx = allEvents.findIndex((ev) => ev.id === eventId);
   if (evIdx >= 0) {
-    allEvents[evIdx].registered = (allEvents[evIdx].registered || 0) + 1;
+    allEvents[evIdx].registered = activeRegs.length + 1;
     if (allEvents[evIdx].registered >= allEvents[evIdx].capacity) {
       allEvents[evIdx].status = "Housefull";
     }
@@ -395,8 +430,17 @@ const cancelRegistration = (regId) => {
   const allEvents = StorageService.getEvents();
   const evIdx = allEvents.findIndex((ev) => ev.id === eventId);
   if (evIdx >= 0) {
-    allEvents[evIdx].registered = Math.max(0, (allEvents[evIdx].registered || 0) - 1);
-    if (allEvents[evIdx].registered < allEvents[evIdx].capacity) {
+    const remainingActive = regs.filter(
+      (r) =>
+        r.eventId === eventId &&
+        r.status !== "Cancelled" &&
+        r.attendance?.status !== "Cancelled"
+    ).length;
+    allEvents[evIdx].registered = remainingActive;
+    if (
+      allEvents[evIdx].status !== "Cancelled" &&
+      remainingActive < (Number(allEvents[evIdx].capacity) || 0)
+    ) {
       allEvents[evIdx].status = "Open";
     }
     StorageService.saveEvents(allEvents);
@@ -504,13 +548,17 @@ const renderPasses = () => {
 
   const upcomingReminders = reminders.filter((rem) => {
     if (new Date(rem.sentAt) > new Date()) return false;
+    const ev = StorageService.getEventById(rem.eventId);
+    if (ev?.status === "Cancelled") return false;
     if (activeStudentId === "ALL") return true;
     // Student-scoped: only show reminders for events this student registered for.
     return regs.some((r) => r.eventId === rem.eventId);
   });
-  const registeredUpcoming = regs.filter(
-    (r) => (r.attendance?.status || r.status) === "Registered"
-  );
+  const registeredUpcoming = regs.filter((r) => {
+    if ((r.attendance?.status || r.status) !== "Registered") return false;
+    const ev = StorageService.getEventById(r.eventId);
+    return ev?.status !== "Cancelled";
+  });
 
   let bannerHtml = `<h3 style="margin:0 0 var(--space-sm) 0; font-size: var(--font-sm); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Upcoming Event Reminders</h3>`;
   if (upcomingReminders.length === 0 && registeredUpcoming.length === 0) {
@@ -817,6 +865,31 @@ const bindEvents = () => {
   if (btnCancel) {
     btnCancel.addEventListener("click", closeRegistrationModal);
   }
+
+  const presetSelect = document.getElementById("reg-student-preset") || fieldStudentPreset;
+  if (presetSelect) {
+    presetSelect.addEventListener("change", (e) => {
+      const studentId = e.target.value;
+      if (!studentId) {
+        if (fieldName) fieldName.value = "";
+        if (fieldStudentId) fieldStudentId.value = "";
+        if (fieldEmail) fieldEmail.value = "";
+        if (fieldDepartment) fieldDepartment.value = "";
+      } else {
+        const students = typeof StorageService.getKnownStudents === "function"
+          ? StorageService.getKnownStudents()
+          : [];
+        const student = students.find((s) => s.studentId === studentId);
+        if (student) {
+          if (fieldName) fieldName.value = student.name || "";
+          if (fieldStudentId) fieldStudentId.value = student.studentId || "";
+          if (fieldEmail) fieldEmail.value = student.email || "";
+          if (fieldDepartment) fieldDepartment.value = student.department || "";
+        }
+      }
+    });
+  }
+
   const clearBtn = document.getElementById("reg-clear-btn") || btnClear;
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
@@ -824,6 +897,8 @@ const bindEvents = () => {
       const curEventId = fieldEventId ? fieldEventId.value : "";
       if (form) form.reset();
       if (fieldEventId && curEventId) fieldEventId.value = curEventId;
+      const curPreset = document.getElementById("reg-student-preset") || fieldStudentPreset;
+      if (curPreset) curPreset.value = "";
     });
   }
   const fillActiveBtn = document.getElementById("reg-fill-active-btn");
@@ -851,12 +926,16 @@ const bindEvents = () => {
       if (fieldEmail) fieldEmail.value = email;
       if (fieldDepartment) fieldDepartment.value = dept;
 
+      const curPreset = document.getElementById("reg-student-preset") || fieldStudentPreset;
+      if (curPreset) curPreset.value = activeStudentId;
+
       if (typeof window.showToast === "function") {
         window.showToast(`Prefilled profile for ${studentName || activeStudentId}.`, "info");
       }
     });
   }
   if (dialogEl) {
+    dialogEl.addEventListener("close", clearRegFormError);
     const closeBtn = dialogEl.querySelector(".dialog-close");
     if (closeBtn) {
       closeBtn.addEventListener("click", closeRegistrationModal);
@@ -955,11 +1034,17 @@ const bindEvents = () => {
       try {
         const link = document.createElement("a");
         link.download = `QR-Pass-${regId || "ticket"}.png`;
-        if (canvas) {
-          link.href = canvas.toDataURL("image/png");
-        } else if (img && img.src) {
-          link.href = img.src;
-        }
+        const exportCanvas = document.createElement("canvas");
+        const padding = 20;
+        const qrSize = 180;
+        exportCanvas.width = qrSize + padding * 2;
+        exportCanvas.height = qrSize + padding * 2;
+        const ctx = exportCanvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        const sourceEl = canvas || img;
+        ctx.drawImage(sourceEl, padding, padding, qrSize, qrSize);
+        link.href = exportCanvas.toDataURL("image/png");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -984,6 +1069,7 @@ const RegistrationModule = {
   init,
   openRegistrationModal,
   closeRegistrationModal,
+  populateRegPresetSelect,
   handleRegistrationSubmit,
   renderPasses,
   showPassQR,

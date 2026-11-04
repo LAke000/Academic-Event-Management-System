@@ -446,7 +446,7 @@ function showTab(tabId) {
   // Update hash to preserve tab on F5 refresh
   try {
     if (window.location.hash !== `#${tabId}`) {
-      window.location.hash = tabId;
+      history.replaceState(null, "", `#${tabId}`);
     }
   } catch (_e) {}
 
@@ -515,6 +515,7 @@ const bindRouter = () => {
     if (hash && document.getElementById(hash)) {
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
       if (ADMIN_TABS.includes(hash) && role !== "admin") return;
+      if (STUDENT_TABS.includes(hash) && role === "admin") return;
       showTab(hash);
     }
   });
@@ -529,20 +530,23 @@ const renderDashboardStats = () => {
   try {
     const events = StorageService.getEvents();
     const registrations = StorageService.getRegistrations();
-    const attended = registrations.filter(
+    const activeRegs = registrations.filter(
+      (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+    );
+    const attended = activeRegs.filter(
       (r) => r.status === "Present" || (r.attendance && r.attendance.status === "Present")
     ).length;
     const feedbackCount = StorageService.getFeedback().length;
 
     // Turnout / conversion rate: share of registrations that turned up Present.
     const turnoutRate =
-      registrations.length > 0
-        ? Math.round((attended / registrations.length) * 100) + "%"
+      activeRegs.length > 0
+        ? Math.round((attended / activeRegs.length) * 100) + "%"
         : "0%";
     // No-show rate: share of registrations that never turned up.
     const noshowRate =
-      registrations.length > 0
-        ? Math.round(((registrations.length - attended) / registrations.length) * 100) + "%"
+      activeRegs.length > 0
+        ? Math.round(((activeRegs.length - attended) / activeRegs.length) * 100) + "%"
         : "0%";
     // Average event rating across all feedback entries (1–5 scale).
     const feedbacks = StorageService.getFeedback();

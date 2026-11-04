@@ -32,7 +32,6 @@ The application operates under a dual-role system:
 
 - **Student / Attendee Mode:** Browse events, register, view digital QR entry passes, view attendance history, submit post-event feedback, and download participation certificates.
 - **Admin / Organizer Mode:** Create and manage events, enforce seat limits, view the registrant roster, run live QR camera scanning at venue doors, review feedback, and export data to CSV.
-- **Gate Delegate (Scan-Only):** A locked sub-view where event volunteers enter a scan code (e.g., `SCAN-CSE-2026`) to activate the camera scanner without accessing admin data.
 
 All data is persisted entirely in the browser using the `localStorage` API. There is no backend server, no SQL database, and no Node.js or Python runtime.
 
@@ -59,10 +58,10 @@ Because the project requires a pure client-side stack with zero backend, the app
 
 | Database Concept | `localStorage` Equivalent in this App |
 |---|---|
-| Database / Schema | Four named collections stored under keys: `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db` |
+| Database / Schema | Five named collections stored under keys: `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db`, `academic_students_db` (plus session keys: `academic_active_role`, `academic_active_student`, `academic_db_cleared`) |
 | Table / Collection | Each key holds a JSON array of objects with a fixed schema |
-| Row / Record | One object inside a collection (e.g., one event, one registration, one feedback entry) |
-| Primary Key | `id` for events, `regId` for registrations, composite `eventId + studentId` for feedback |
+| Row / Record | One object inside a collection (e.g., one event, one registration, one feedback entry, one reminder, one student profile) |
+| Primary Key | `id` for events, `regId` for registrations, `feedbackId` (and composite `eventId + studentId`) for feedback, `reminderId` for reminders, `studentId` for students |
 | CREATE | `setItem(key, JSON.stringify(array))` after appending a new object |
 | READ | `getItem(key)` then `JSON.parse()` to rehydrate the array |
 | UPDATE | Read array, mutate target object in memory, `setItem` the full array |
@@ -112,7 +111,7 @@ Because the project requires a pure client-side stack with zero backend, the app
 
 ## Critical Business Rules
 
-1. **Deduplication Check:** Before saving a registration, `registration.js` checks `registrations_db` for an existing match of `studentId` AND `eventId`. A student cannot register twice for the same event.
+1. **Deduplication Check:** Before saving a registration, `registration.js` checks `academic_registrations_db` for an existing match of `studentId` AND `eventId`. A student cannot register twice for the same event.
 2. **Capacity Enforcement:** Registration is disabled when `total_registered === event.capacity`. The UI displays **"Housefull"** and blocks further registration.
 3. **Gated Post-Event Access:** The Feedback form and Certificate download are only accessible if `attendance.status === "Present"`. Absent students cannot claim certificates.
 4. **Empty States:** User-friendly "Call to Action" screens appear when `localStorage` is empty (e.g., "No Events Created Yet → [Create Event]").
@@ -152,7 +151,7 @@ academic-event-system/
 | `css/main.css` | CSS custom properties (design tokens: navy `#1e3a8a`, slate grays), reset rules, layout grid, responsive sidebar and main viewport. |
 | `css/components.css` | Reusable components: cards, data tables, badges (Open / Housefull / Registered / Present), toast alerts, star-rating, form fields, buttons, empty states. |
 | `css/print.css` | `@media print` stylesheet for QR passes and certificates — hides nav/buttons, optimizes for paper output. |
-| `js/storage.js` | `localStorage` wrapper: `get`, `set`, `remove` for `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db`. Demo Data Seeder populates synthetic campus events and registrations. |
+| `js/storage.js` | `localStorage` wrapper: `get`, `set`, `remove` for `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db`, `academic_students_db`. Demo Data Seeder populates synthetic campus events, registrations, feedback, reminders, and demo student profiles. |
 | `js/utils.js` | Shared helpers: `generateId()` for unique IDs, `deepClone()` for record integrity, `formatDate()` for ISO date formatting. |
 | `js/events.js` | Event CRUD operations, dynamic capacity counting, "Housefull" badge rendering, event card/table row generation. |
 | `js/registration.js` | Student registration flow, deduplication logic (`studentId` + `eventId`), QR pass generation via `qrcode.min.js`, pass modal rendering. |
@@ -171,7 +170,7 @@ Only three external libraries are loaded via CDN, all vanilla-compatible:
 
 | Library | Purpose | CDN |
 |---|---|---|
-| `qrcode.min.js` | Generates the student's unique digital QR entry pass | `[https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js](https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js)` |
+| `qrcode.min.js` | Generates the student's unique digital QR entry pass | `https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js` |
 | `html5-qrcode.min.js` | Accesses the device webcam to scan student QR codes live at the venue door | `https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8` |
 | `Chart.js` | Renders attendance and turnout analytics in the Reports section | `https://cdn.jsdelivr.net/npm/chart.js` |
 
@@ -179,49 +178,113 @@ Only three external libraries are loaded via CDN, all vanilla-compatible:
 
 ## Database Schemas (localStorage)
 
-### 1. `events_db`
+All data is stored in the browser's `localStorage` using the exact keys and object schemas defined below. All date/time timestamps conform to ISO 8601 strings.
+
+### 1. `academic_events_db`
+
+Stores published academic event definitions, session schedules, and capacity limits.
 
 ```json
-[{
-  "id": "EVT-101",
-  "title": "State-of-the-Art Deep Learning",
-  "type": "Workshop",
-  "department": "CSE",
-  "venue": "Audi-3",
-  "dateTime": "2026-11-15T10:00",
-  "capacity": 60,
-  "speaker": "Dr. A. Sharma",
-  "status": "Active"
-}]
-```
-
-### 2. `registrations_db`
-
-```json
-[{
-  "regId": "REG-9901",
-  "eventId": "EVT-101",
-  "studentName": "Sachin Kumar",
-  "studentId": "12601928",
-  "email": "sachin@test.com",
-  "registeredAt": "2026-11-01T14:20:00Z",
-  "attendance": {
-    "status": "Present",
-    "checkInTime": "2026-11-15T09:52:10Z"
+[
+  {
+    "id": "EVT-101",
+    "title": "State-of-the-Art Deep Learning & Computer Vision Workshop",
+    "type": "Workshop",
+    "department": "CSE",
+    "venue": "Audi-3 Block 34",
+    "date": "2026-11-15T09:00:00",
+    "endTime": "2026-11-15T12:00:00",
+    "deadline": "2026-11-14T09:00:00",
+    "capacity": 60,
+    "registered": 2,
+    "status": "Open",
+    "speaker": "Dr. A. Sharma",
+    "description": "Hands-on deep learning workshop covering neural network architectures, CNNs, and computer vision pipelines."
   }
-}]
+]
 ```
 
-### 3. `feedback_db`
+### 2. `academic_registrations_db`
+
+Stores student registration records, ticket IDs, and check-in / attendance records.
 
 ```json
-[{
-  "eventId": "EVT-101",
-  "studentId": "12601928",
-  "rating": 5,
-  "comments": "Great hands-on session."
-}]
+[
+  {
+    "regId": "REG-8821",
+    "eventId": "EVT-101",
+    "studentId": "12601928",
+    "name": "Alice Kumar",
+    "email": "alice.kumar@example.edu",
+    "department": "CSE",
+    "timestamp": "2026-11-01T14:20:00.000Z",
+    "registeredAt": "2026-11-01T14:20:00.000Z",
+    "status": "Present",
+    "checkInTime": "2026-11-15T09:52:10.000Z",
+    "attendance": {
+      "status": "Present",
+      "checkInTime": "2026-11-15T09:52:10.000Z"
+    }
+  }
+]
 ```
+
+### 3. `academic_feedback_db`
+
+Stores post-event feedback submitted by attendees who were verified as `Present`.
+
+```json
+[
+  {
+    "feedbackId": "FB-8801",
+    "eventId": "EVT-101",
+    "studentId": "12601928",
+    "rating": 5,
+    "speakerQuality": 5,
+    "contentRelevance": 5,
+    "venueOrganization": 5,
+    "comment": "Excellent workshop, very hands‑on and well paced.",
+    "timestamp": "2026-11-15T12:30:00.000Z"
+  }
+]
+```
+
+### 4. `academic_reminders_db`
+
+Stores organizer broadcast notices and email/push reminders dispatched for upcoming events.
+
+```json
+[
+  {
+    "reminderId": "REM-9001",
+    "eventId": "EVT-101",
+    "message": "Reminder: Deep Learning & Computer Vision Workshop starts tomorrow at 09:00 in Audi-3 Block 34.",
+    "sentAt": "2026-11-14T09:00:00.000Z",
+    "sentToCount": 2
+  }
+]
+```
+
+### 5. `academic_students_db`
+
+Stores known campus student profiles used for evaluator quick-fill and profile autofill.
+
+```json
+[
+  {
+    "studentId": "12601928",
+    "name": "Alice Kumar",
+    "email": "alice.kumar@example.edu",
+    "department": "CSE"
+  }
+]
+```
+
+### Session & Operational Keys
+
+- `academic_active_role`: Current user mode (`"student"` or `"admin"`).
+- `academic_active_student`: Currently active student roll number for profile simulation (e.g. `"12601928"` or `"ALL"`).
+- `academic_db_cleared`: Flag (`"true"`) set when evaluator clicks "Clear All Data" to prevent unintended automatic reseeding.
 
 All date/time values use ISO 8601 strings. The values shown above are synthetic/sample data per the project specification, not production data.
 
@@ -252,12 +315,14 @@ Instructions for professors and evaluators:
 
 1. **Open the portal.** Launch `index.html` in the browser. You start in **Student Mode** with an empty `localStorage`.
 2. **Load demo academic data.** Switch to **Admin / Organizer Mode** using the toggle in the top bar, then click **"Load Demo Academic Data"** on the Dashboard. This seeds:
-   - `events_db` with sample events (e.g., Deep Learning Workshop in Audi-3, Department of CSE)
-   - `registrations_db` with sample student registrations
-   - `feedback_db` with sample reviews
+   - `academic_events_db` with sample events (e.g., Deep Learning Workshop in Audi-3, Department of CSE)
+   - `academic_registrations_db` with sample student registrations
+   - `academic_feedback_db` with sample reviews
+   - `academic_reminders_db` with sample organizer reminders
+   - `academic_students_db` with known campus student demo profiles
 3. **Explore as a student.** Switch back to **Student Mode**. Browse events on **Discover Events**, register for an event, and open **My Passes** to see the generated QR entry pass. Click **Print Pass** to test the print stylesheet.
 4. **Test capacity and deduplication.** Register the same student for the same event twice — the second attempt is blocked by deduplication logic. Fill an event to capacity — the UI displays **"Housefull"** and disables further registration.
-5. **Test the gate delegate scanner.** In Admin Mode, open **Live QR Scanner**, click **Start Camera**, and scan a student's QR pass from another device (or a printed pass). A check-in toast appears and the roster updates to `Present`. Use the manual check-in search as a fallback.
+5. **Test the live QR scanner.** In Admin Mode, open **Live QR Scanner**, click **Start Camera**, and scan a student's QR pass from another device (or a printed pass). A check-in toast appears and the roster updates to `Present`. Use the manual check-in search as a fallback.
 6. **Test gated post-event access.** Once a student is checked in as **Present**, they can open **History & Certificates**, submit feedback via the 5-star rating form, and download a PNG certificate generated on an HTML5 `<canvas>`.
 7. **Export reports.** In Admin Mode, open **Reports & CSV Export** and export Registrations, Attendance, or Feedback as CSV files using native Browser Blobs (no server round-trip). View the Chart.js attendance chart.
 8. **Reset state.** Click **Clear All Data** on the Dashboard to wipe `localStorage` and return to a clean slate for the next demo.

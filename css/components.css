@@ -27,6 +27,57 @@
   box-sizing: border-box;
 }
 
+/* When hidden attribute is set on the discover grid, ensure it stays hidden
+   even though the ID selector sets display: grid above. */
+#discover-list[hidden] {
+  display: none !important;
+}
+
+/* Discover filter controls bar */
+.discover-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+  background-color: var(--color-surface);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.discover-controls[hidden] {
+  display: none !important;
+}
+
+.discover-controls #event-search-input {
+  grid-column: 1 / -1;
+}
+
+.discover-controls select,
+.discover-controls input[type="date"],
+.discover-controls input[type="text"] {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .discover-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .discover-controls #btn-reset-filters {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 540px) {
+  .discover-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
 .event-card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -389,6 +440,7 @@ dialog[open] {
   color: var(--color-text-primary);
   max-width: 720px;
   width: 90vw;
+  height: fit-content;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
@@ -412,7 +464,19 @@ dialog::backdrop {
 .dialog-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 100%;
+  max-height: 90vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dialog-header,
+.dialog-footer {
+  flex-shrink: 0;
+}
+
+.dialog-footer {
+  flex-wrap: wrap;
 }
 
 .dialog-header {
@@ -453,12 +517,28 @@ dialog::backdrop {
 
 .dialog-body,
 .dialog > .dialog-panel > :not(header):not(footer) {
-  padding: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-md);
+}
+
+.dialog > .dialog-panel > .pass-layout {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-lg);
+}
+
+.dialog > .dialog-panel > .certificate-body {
+  padding: var(--space-md) var(--space-lg);
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .dialog-footer {
@@ -897,9 +977,9 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
   background-color: var(--color-surface-secondary);
-  min-height: 500px;
+  min-height: 0;
 }
 
 #certCanvas {
@@ -908,7 +988,10 @@ input[type="radio"] {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   max-width: 100%;
+  max-height: calc(90vh - 180px);
+  width: auto;
   height: auto;
+  object-fit: contain;
 }
 
 /* 6. Button System Extensions */

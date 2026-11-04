@@ -61,46 +61,84 @@ const formatDate = (iso) => {
   }
 };
 
-// ─── Decorative seal (rosette via canvas arcs) ────────────────────────────
+// ─── Decorative seal (rosette with ribbon tails via canvas paths) ──────────
 
 /**
- * Draw a vector rosette/seal directly with 2D canvas path arcs.
+ * Draw an executive diploma rosette seal with serrated gold foil,
+ * concentric inner rings, and twin crimson/navy ribbon tails.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} cx - center X
  * @param {number} cy - center Y
  * @param {number} outerR - outer radius
  */
 const drawSeal = (ctx, cx, cy, outerR) => {
-  const innerR = outerR * 0.55;
-  const petals = 10;
+  const innerR = outerR * 0.72;
+  const teeth = 24;
   ctx.save();
   ctx.translate(cx, cy);
+
+  // Twin crimson/navy ribbon tails
+  ctx.fillStyle = NAVY;
+  ctx.beginPath();
+  ctx.moveTo(-18, outerR * 0.6);
+  ctx.lineTo(-34, outerR * 1.45);
+  ctx.lineTo(-16, outerR * 1.28);
+  ctx.lineTo(-4, outerR * 1.48);
+  ctx.lineTo(-2, outerR * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(18, outerR * 0.6);
+  ctx.lineTo(34, outerR * 1.45);
+  ctx.lineTo(16, outerR * 1.28);
+  ctx.lineTo(4, outerR * 1.48);
+  ctx.lineTo(2, outerR * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Serrated gold foil rosette
   ctx.fillStyle = "#fef3c7";
   ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  for (let i = 0; i < petals; i++) {
-    const a1 = (i / petals) * 2 * Math.PI;
-    const a2 = ((i + 0.5) / petals) * 2 * Math.PI;
-    const a3 = ((i + 1) / petals) * 2 * Math.PI;
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, outerR, a1, a2);
-    ctx.arc(0, 0, innerR, a2, a3, true);
+  for (let i = 0; i < teeth; i++) {
+    const a1 = (i / teeth) * Math.PI * 2;
+    const a2 = ((i + 0.5) / teeth) * Math.PI * 2;
+    const x1 = Math.cos(a1) * outerR;
+    const y1 = Math.sin(a1) * outerR;
+    const x2 = Math.cos(a2) * innerR;
+    const y2 = Math.sin(a2) * innerR;
+    if (i === 0) ctx.moveTo(x1, y1);
+    else ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
   }
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  // Inner accent circle
+
+  // Inner concentric seal rings
+  ctx.fillStyle = "#fde68a";
   ctx.beginPath();
-  ctx.arc(0, 0, outerR * 0.3, 0, 2 * Math.PI);
+  ctx.arc(0, 0, innerR * 0.82, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
+
+  ctx.fillStyle = NAVY;
+  ctx.font = "bold 9px 'Helvetica Neue', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("OFFICIAL", 0, -6);
+  ctx.fillText("SEAL", 0, 6);
   ctx.restore();
 };
 
-// ─── Canvas drawing engine (1000 × 700) ───────────────────────────────────
+// ─── Canvas drawing engine (1000 × 700) — Executive Diploma ───────────────
 
 /**
- * Render a formal Certificate of Participation onto the canvas.
+ * Render a formal executive-style Certificate of Participation onto the canvas.
+ * Features: warm parchment background, navy/gold framing with filigree corners,
+ * academic shield crest, institution header, and center rosette seal.
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} reg - registration record
  * @param {object} event - event record
@@ -109,125 +147,181 @@ const drawCertificate = (ctx, reg, event) => {
   const w = CANVAS_WIDTH;
   const h = CANVAS_HEIGHT;
 
-  // Off-white background (full bleed)
-  ctx.fillStyle = OFF_WHITE;
+  // Warm parchment background
+  ctx.fillStyle = "#fdfbf7";
   ctx.fillRect(0, 0, w, h);
 
-  // ── Dual formal borders ──
-  // Outer: University Navy, 12px
+  // Outer Navy Frame & Inner Gold Filigree Frame
   ctx.strokeStyle = NAVY;
-  ctx.lineWidth = 12;
-  ctx.strokeRect(40, 40, w - 80, h - 80);
-  // Inner: Academic Gold/Amber, 3px
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(60, 60, w - 120, h - 120);
+  ctx.lineWidth = 10;
+  ctx.strokeRect(32, 32, w - 64, h - 64);
 
-  // ── Header: tracked sans-serif bold ──
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(48, 48, w - 96, h - 96);
+
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(56, 56, w - 112, h - 112);
+
+  // Ornamental gold corner brackets
+  const corners = [
+    [64, 64, 1, 1],
+    [w - 64, 64, -1, 1],
+    [64, h - 64, 1, -1],
+    [w - 64, h - 64, -1, -1],
+  ];
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2.5;
+  corners.forEach(([cx, cy, dx, dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + dy * 28);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx + dx * 28, cy);
+    ctx.stroke();
+  });
+
+  // Top Academic Shield Crest
+  ctx.save();
+  ctx.translate(w / 2, 92);
   ctx.fillStyle = NAVY;
-  ctx.font = "bold 18px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.lineTo(20, -14);
+  ctx.lineTo(20, 4);
+  ctx.quadraticCurveTo(20, 20, 0, 26);
+  ctx.quadraticCurveTo(-20, 20, -20, 4);
+  ctx.lineTo(-20, -14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 13px 'Georgia', serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const header = "UNIVERSITY ACADEMIC EVENT NETWORK";
-  const track = 6;
-  let x = (w - header.length * (12 + track)) / 2 + 12 / 2;
-  ctx.save();
-  ctx.translate(x, 80);
-  for (let i = 0; i < header.length; i++) {
-    ctx.translate(track, 0);
-    ctx.fillText(header[i], 0, 0);
-  }
+  ctx.fillText("AEMS", 0, 1);
   ctx.restore();
 
-  // ── Title: classic serif, large ──
-  ctx.font = "bold 44px 'Georgia', 'Times New Roman', serif";
+  // Institution Header (cleanly spaced, no character overlap)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.fillStyle = NAVY;
-  ctx.fillText("Certificate of Participation", w / 2, 170);
+  ctx.font = "bold 16px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillText("UNIVERSITY ACADEMIC EVENT NETWORK", w / 2, 138);
 
-  // ── Body: presented to ──
-  ctx.font = "22px 'Georgia', 'Times New Roman', serif";
+  ctx.fillStyle = GOLD;
+  ctx.font = "bold 11px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillText("OFFICIAL ACADEMIC CREDENTIAL", w / 2, 158);
+
+  // Main Diploma Title
+  ctx.fillStyle = NAVY;
+  ctx.font = "bold 42px 'Georgia', 'Times New Roman', serif";
+  ctx.fillText("Certificate of Participation", w / 2, 205);
+
+  // Decorative gold rule under title
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 140, 232);
+  ctx.lineTo(w / 2 + 140, 232);
+  ctx.stroke();
+
+  // Presentation Line
+  ctx.font = "italic 20px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = "#475569";
-  ctx.fillText("This is proudly presented to", w / 2, 245);
+  ctx.fillText("This is proudly presented to", w / 2, 266);
 
-  // ── Student name: large bold serif ──
-  ctx.font = "bold 34px 'Georgia', 'Times New Roman', serif";
+  // Recipient Name + Gold Underline
+  ctx.font = "bold 36px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(reg.name || "", w / 2, 285);
+  ctx.fillText(reg.name || "Student Attendee", w / 2, 310);
 
-  // ── Roll No ──
-  ctx.font = "19px 'Georgia', 'Times New Roman', serif";
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 180, 330);
+  ctx.lineTo(w / 2 + 180, 330);
+  ctx.stroke();
+
+  // Roll No & Recognition Text
+  ctx.font = "bold 15px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillStyle = "#475569";
+  ctx.fillText(`Roll No: ${reg.studentId || "—"}`, w / 2, 352);
+
+  ctx.font = "italic 18px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText(`Roll No: ${reg.studentId || ""}`, w / 2, 320);
+  ctx.fillText(
+    `for active participation and successful completion of the ${event && event.type ? event.type : "Academic Event"}`,
+    w / 2,
+    384
+  );
 
-  // ── Category ──
-  ctx.font = "19px 'Georgia', 'Times New Roman', serif";
-  ctx.fillStyle = "#64748b";
-  ctx.fillText(`Category: ${event ? event.type : ""}`, w / 2, 360);
-
-  // ── Event title ──
-  ctx.font = "bold 21px 'Georgia', 'Times New Roman', serif";
+  // Event Title
+  ctx.font = "bold 23px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.fillText(event ? event.title : "Unknown Event", w / 2, 395);
+  ctx.fillText(event ? event.title : "Academic Event", w / 2, 418);
 
-  // ── Department ──
-  ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillStyle = "#64748b";
+  // Department Line
   const evDept = event ? event.department || "" : "";
   const stDept = reg.department || "";
   const deptLine =
     evDept && stDept && evDept.toLowerCase() !== stDept.toLowerCase()
-      ? `Department: ${evDept} · Attendee Dept: ${stDept}`
-      : `Department: ${evDept || stDept || "—"}`;
-  ctx.fillText(deptLine, w / 2, 425);
+      ? `Organized by Department of ${evDept}  ·  Attendee Dept: ${stDept}`
+      : `Organized by Department of ${evDept || stDept || "Academics"}`;
+  ctx.font = "14px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillStyle = "#64748b";
+  ctx.fillText(deptLine, w / 2, 448);
 
-  // ── Metadata line: Date, Venue, Verification ID ──
-  ctx.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillStyle = "#94a3b8";
+  // Metadata Band (Date, Venue, Verification ID)
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(110, 472);
+  ctx.lineTo(w - 110, 472);
+  ctx.moveTo(110, 506);
+  ctx.lineTo(w - 110, 506);
+  ctx.stroke();
+
   const dateStr = event ? formatDate(event.date) : "—";
-  ctx.textAlign = "left";
-  ctx.fillText(`Date: ${dateStr}`, 130, 465);
-  ctx.textAlign = "center";
-  ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 465);
-  ctx.textAlign = "right";
   const certId =
     "CERT-" +
     (reg.eventId || "EVT") +
     "-" +
     (reg.regId || "").replace(/^REG-/, "");
-  ctx.fillText(`Verification ID: ${certId}`, w - 130, 465);
 
-  // ── Divider ──
-  ctx.strokeStyle = "#cbd5e1";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(130, 505);
-  ctx.lineTo(w - 130, 505);
-  ctx.stroke();
+  ctx.font = "bold 13px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillStyle = "#334155";
+  ctx.textAlign = "left";
+  ctx.fillText(`Date: ${dateStr}`, 120, 489);
+  ctx.textAlign = "center";
+  ctx.fillText(`Venue: ${event ? event.venue : "—"}`, w / 2, 489);
+  ctx.textAlign = "right";
+  ctx.fillText(`Verification ID: ${certId}`, w - 120, 489);
 
-  // ── Organizer & Dean Signatures (drawn above the signature lines at y=555) ──
+  // Signatures & Center Seal
+  ctx.textAlign = "center";
   ctx.font = "italic bold 18px 'Georgia', 'Times New Roman', serif";
   ctx.fillStyle = NAVY;
-  ctx.textAlign = "center";
-  ctx.fillText(event && event.speaker ? event.speaker : "Dr. A. Sharma", w / 4, 555);
-  ctx.fillText("Office of Academic Affairs", (3 * w) / 4, 555);
+  ctx.fillText(event && event.speaker ? event.speaker : "Dr. A. Sharma", 240, 568);
+  ctx.fillText("Office of Academic Affairs", w - 240, 568);
 
-  // ── Signature placeholder lines (above labels at y=568) ──
-  ctx.font = "14px 'Georgia', 'Times New Roman', serif";
-  ctx.fillStyle = "#475569";
-  ctx.textAlign = "center";
-  ctx.fillText("Event Coordinator", w / 4, 595);
-  ctx.fillText("Dean of Academics", (3 * w) / 4, 595);
   ctx.strokeStyle = "#94a3b8";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(w / 4 - 100, 568);
-  ctx.lineTo(w / 4 + 100, 568);
-  ctx.moveTo((3 * w) / 4 - 100, 568);
-  ctx.lineTo((3 * w) / 4 + 100, 568);
+  ctx.moveTo(130, 584);
+  ctx.lineTo(350, 584);
+  ctx.moveTo(w - 350, 584);
+  ctx.lineTo(w - 130, 584);
   ctx.stroke();
 
-  // ── Corner decorative seal (bottom-left) ──
-  drawSeal(ctx, 135, h - 135, 45);
+  ctx.font = "bold 13px 'Helvetica Neue', Arial, sans-serif";
+  ctx.fillStyle = "#475569";
+  ctx.fillText("Event Coordinator", 240, 604);
+  ctx.fillText("Dean of Academics", w - 240, 604);
+
+  drawSeal(ctx, w / 2, 568, 38);
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -244,8 +338,19 @@ const generateCertificate = (regId) => {
     return;
   }
 
-  // Eligibility gate: only Present attendance earns a certificate.
   const attendance = reg.attendance || {};
+  if (
+    reg.status === "Cancelled" ||
+    attendance.status === "Cancelled"
+  ) {
+    window.showToast(
+      "Cannot generate certificate for a cancelled registration.",
+      "error"
+    );
+    return;
+  }
+
+  // Eligibility gate: only Present attendance earns a certificate.
   const isPresent =
     attendance.status === "Present" || reg.status === "Present";
   if (!isPresent) {
@@ -259,6 +364,14 @@ const generateCertificate = (regId) => {
   const event = StorageService.getEventById(reg.eventId);
   if (!event) {
     window.showToast("Event not found.", "error");
+    return;
+  }
+
+  if (event.status === "Cancelled") {
+    window.showToast(
+      "Cannot generate certificate for a cancelled event.",
+      "error"
+    );
     return;
   }
 

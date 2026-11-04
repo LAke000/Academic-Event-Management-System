@@ -83,6 +83,13 @@
     break-inside: avoid;
   }
 
+  /* Modal Backdrop Suppression */
+  dialog::backdrop {
+    display: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
   /* Ensure only the intended print target is visible per context (open dialogs only) */
   #pass-dialog[open],
   #certificate-dialog[open] {
@@ -183,6 +190,16 @@
     padding: 4pt !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    margin: 0 auto !important;
+  }
+
+  #pass-dialog #qrcode-target canvas,
+  #pass-dialog #qrcode-target img {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 128px !important;
+    height: 128px !important;
+    object-fit: contain !important;
     margin: 0 auto !important;
   }
 

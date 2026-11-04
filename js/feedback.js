@@ -124,12 +124,20 @@ const FeedbackModule = (() => {
   const openFeedbackDialog = (eventId, studentId) => {
     if (!feedbackDialog) return;
 
-    // Guard: check eligibility — must be Present (dual state for consistency)
+    const ev = StorageService.getEventById(eventId);
+    if (ev?.status === "Cancelled") {
+      window.showToast?.("Feedback is closed for cancelled events.", "error");
+      return;
+    }
+
+    // Guard: check eligibility — must be Present (dual state for consistency) and not cancelled
     const regs = StorageService.getRegistrations();
     const reg = regs.find(
       (r) =>
         r.eventId === eventId &&
         r.studentId === studentId &&
+        r.status !== "Cancelled" &&
+        r.attendance?.status !== "Cancelled" &&
         (r.status === "Present" || (r.attendance && r.attendance.status === "Present"))
     );
     if (!reg) {
