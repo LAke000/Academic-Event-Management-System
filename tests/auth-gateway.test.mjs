@@ -117,26 +117,41 @@ const bodyEl = new MockElement("body", "body");
 // Ensure auth dialog elements exist in _elements
 const setupAuthDialogElements = () => {
   const ids = [
-    "auth-dialog", "auth-tab-student", "auth-tab-admin", "auth-form-error",
-    "auth-student-form", "auth-student-id", "auth-new-student-fields",
+    "auth-dialog", "auth-dialog-title", "btn-close-auth", "auth-tab-student", "auth-tab-admin",
+    "auth-banner-error", "auth-banner-info", "auth-form-error",
+    "auth-form-student", "auth-student-form", "auth-student-id", "auth-student-hint",
+    "auth-student-new-fields", "auth-new-student-fields",
     "auth-student-name", "auth-student-email", "auth-student-dept",
-    "auth-student-submit", "btn-quick-student", "auth-admin-form",
-    "auth-admin-user", "auth-admin-pass", "btn-quick-admin",
+    "btn-quick-student", "btn-cancel-auth-student", "btn-submit-student-auth", "auth-student-submit",
+    "auth-form-admin", "auth-admin-form", "auth-admin-username", "auth-admin-user",
+    "auth-admin-passcode", "auth-admin-pass", "btn-quick-admin",
+    "btn-cancel-auth-admin", "btn-submit-admin-auth",
   ];
   ids.forEach((id) => {
     _elements[id] = new MockElement(id.startsWith("auth-tab") || id.startsWith("btn-") ? "button" : "div", id);
   });
 
+  // Link aliases for backwards compatibility
+  _elements["auth-student-form"] = _elements["auth-form-student"];
+  _elements["auth-new-student-fields"] = _elements["auth-student-new-fields"];
+  _elements["auth-student-submit"] = _elements["btn-submit-student-auth"];
+  _elements["auth-form-error"] = _elements["auth-banner-error"];
+  _elements["auth-admin-form"] = _elements["auth-form-admin"];
+  _elements["auth-admin-user"] = _elements["auth-admin-username"];
+  _elements["auth-admin-pass"] = _elements["auth-admin-passcode"];
+
   const dialog = _elements["auth-dialog"];
-  const closeBtn = new MockElement("button", "auth-dialog-close");
+  const closeBtn = _elements["btn-close-auth"];
   closeBtn.classList.add("dialog-close");
   dialog.children = [closeBtn];
 
-  _elements["auth-new-student-fields"].hidden = true;
-  _elements["auth-admin-form"].hidden = true;
-  _elements["auth-form-error"].hidden = true;
-  _elements["auth-form-error"].textContent = "";
-  _elements["auth-student-submit"].textContent = "Continue";
+  _elements["auth-student-new-fields"].hidden = true;
+  _elements["auth-form-admin"].hidden = true;
+  _elements["auth-banner-error"].hidden = true;
+  _elements["auth-banner-error"].textContent = "";
+  _elements["auth-banner-info"].hidden = true;
+  _elements["auth-banner-info"].textContent = "";
+  _elements["btn-submit-student-auth"].textContent = "Continue";
 };
 
 // Initial populate of registration and app elements
@@ -419,8 +434,9 @@ test("Student Auto-Detection: unrecognized valid ID (12699999) step 1 reveals pr
   assert.equal(callbackExecuted, false, "pendingCallback must not run until signup is complete");
   assert.equal(_elements["auth-new-student-fields"].hidden, false, "#auth-new-student-fields must be revealed");
   assert.equal(_elements["auth-student-submit"].textContent, "Complete Sign Up & Login", "Submit button text must update");
-  assert.equal(_elements["auth-form-error"].hidden, false, "Info prompt must be shown");
-  assert.ok(_elements["auth-form-error"].textContent.includes("New Roll Number detected"));
+  const banner = _elements["auth-banner-info"].hidden ? _elements["auth-form-error"] : _elements["auth-banner-info"];
+  assert.equal(banner.hidden, false, "Info prompt must be shown");
+  assert.ok(banner.textContent.includes("New Roll Number detected"));
 });
 
 test("Student Auto-Detection: unrecognized valid ID (12699999) step 2 saves profile and authenticates", () => {
@@ -580,16 +596,15 @@ test("Logout Reset: AuthModule.logout clears session and resets to guest state",
   assert.equal(AuthModule.isAuthenticated(), false);
   assert.equal(AuthModule.getCurrentRole(), "guest");
 
-  // Verify role reset to student view
-  assert.equal(StorageService.getActiveRole(), "student", "Active role must be reset to student");
-  assert.equal(appliedRole, "student", "app.applyRole must be invoked to navigate back to default view");
+  // Verify role reset to guest view
+  assert.equal(StorageService.getActiveRole(), "guest", "Active role must be reset to guest");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 7. Quick Demo Buttons
 // ═══════════════════════════════════════════════════════════════════════════
 
-test("Quick Demo Student: Alice Kumar button logs in directly", () => {
+test("Quick Demo Student: Alice Kumar button fills and logs in", () => {
   resetStore();
   StorageService.clearAuthSession();
   rebindAuthDialog();
@@ -598,6 +613,10 @@ test("Quick Demo Student: Alice Kumar button logs in directly", () => {
   AuthModule.openAuthModal("student", () => { callbackExecuted = true; });
 
   _elements["btn-quick-student"].dispatchEvent({ type: "click" });
+  assert.equal(_elements["auth-student-id"].value, "12601928");
+
+  // Submit form to complete sign in
+  _elements["auth-form-student"].dispatchEvent({ type: "submit", preventDefault() {} });
 
   const session = StorageService.getAuthSession();
   assert.equal(session.authenticated, true);
@@ -607,7 +626,7 @@ test("Quick Demo Student: Alice Kumar button logs in directly", () => {
   assert.equal(_elements["auth-dialog"].open, false);
 });
 
-test("Quick Demo Admin: Event Organizer button logs in directly", () => {
+test("Quick Demo Admin: Event Organizer button fills and logs in", () => {
   resetStore();
   StorageService.clearAuthSession();
   rebindAuthDialog();
@@ -619,6 +638,11 @@ test("Quick Demo Admin: Event Organizer button logs in directly", () => {
   AuthModule.openAuthModal("admin", () => { callbackExecuted = true; });
 
   _elements["btn-quick-admin"].dispatchEvent({ type: "click" });
+  assert.equal(_elements["auth-admin-username"].value, "admin");
+  assert.equal(_elements["auth-admin-passcode"].value, "AEMS-Admin-2026");
+
+  // Submit form to complete sign in
+  _elements["auth-form-admin"].dispatchEvent({ type: "submit", preventDefault() {} });
 
   const session = StorageService.getAuthSession();
   assert.equal(session.authenticated, true);

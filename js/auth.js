@@ -1,461 +1,452 @@
-// js/auth.js – Authentication & Session Gateway
+// js/auth.js – Authentication Gateway & Identity Engine
 // Academic Event Registration System (pure vanilla SPA, ECC compliant)
-// Single responsibility: owns the sign-in/sign-up dialog, session
-// management, role-gated access, and the 126xxxxx roll validation.
-// Zero-truncation: all student records are persisted in full.
 
 import StorageService from "./storage.js";
-
-// ─── Constants ──────────────────────────────────────────────────────────────
 
 const ROLL_REGEX = /^126\d{5}$/;
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "AEMS-Admin-2026";
 const AUTH_DIALOG_ID = "auth-dialog";
 
-// ─── Pending callback (deferred action after successful auth) ──────────────
+let authDialog = null;
+let tabStudent = null;
+let tabAdmin = null;
+let formStudent = null;
+let formAdmin = null;
+let studentIdInput = null;
+let studentNewFields = null;
+let studentNameInput = null;
+let studentEmailInput = null;
+let studentDeptInput = null;
+let adminUsernameInput = null;
+let adminPasscodeInput = null;
+let bannerError = null;
+let bannerInfo = null;
+let btnSubmitStudent = null;
 
 let pendingCallback = null;
-
-// ─── Dialog Markup Injection ─────────────────────────────────────────────────
 
 const ensureAuthDialog = () => {
   if (document.getElementById(AUTH_DIALOG_ID)) return;
 
   const markup = `
-<dialog id="${AUTH_DIALOG_ID}" class="dialog">
-  <div class="dialog-panel">
-    <header class="dialog-header">
-      <h2>Sign In to AEMS</h2>
-      <button class="dialog-close" aria-label="Close dialog">&times;</button>
-    </header>
-    <div class="auth-tabs" role="tablist">
-      <button type="button" class="auth-tab active" id="auth-tab-student" role="tab" aria-selected="true" aria-controls="auth-student-form">Student Login</button>
-      <button type="button" class="auth-tab" id="auth-tab-admin" role="tab" aria-selected="false" aria-controls="auth-admin-form">Admin / Organizer Login</button>
+  <dialog id="${AUTH_DIALOG_ID}" class="dialog">
+    <div class="dialog-panel">
+      <header class="dialog-header">
+        <h2 id="auth-dialog-title">Campus Portal Sign In</h2>
+        <button class="dialog-close" id="btn-close-auth" aria-label="Close authentication dialog">&times;</button>
+      </header>
+
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab-btn active" id="auth-tab-student" role="tab" aria-selected="true">Student Portal</button>
+        <button type="button" class="auth-tab-btn" id="auth-tab-admin" role="tab" aria-selected="false">Organizer / Admin</button>
+      </div>
+
+      <div id="auth-banner-error" class="auth-banner auth-banner--error" hidden role="alert"></div>
+      <div id="auth-banner-info" class="auth-banner auth-banner--info" hidden role="status"></div>
+
+      <!-- STUDENT AUTH FORM -->
+      <form id="auth-form-student" class="auth-form-pane" novalidate>
+        <div class="form-field">
+          <label class="form-label" for="auth-student-id">Student ID / Roll Number</label>
+          <input type="text" id="auth-student-id" name="studentId" placeholder="8-digit ID starting with 126 (e.g. 12601928)" maxlength="8" autocomplete="off" required>
+          <span class="form-hint" id="auth-student-hint">Format: 8 digits starting with 126 (e.g. 12601928)</span>
+        </div>
+
+        <div id="auth-student-new-fields" class="auth-step-fields" hidden>
+          <div class="auth-step-divider">
+            <span>New Student Registration</span>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="auth-student-name">Full Name</label>
+            <input type="text" id="auth-student-name" name="name" placeholder="e.g. Alice Kumar" maxlength="80">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="auth-student-email">University Email</label>
+            <input type="email" id="auth-student-email" name="email" placeholder="e.g. alice.kumar@example.edu" maxlength="100">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="auth-student-dept">Department</label>
+            <input type="text" id="auth-student-dept" name="department" placeholder="e.g. CSE, IT, ME" maxlength="60">
+          </div>
+        </div>
+
+        <div class="auth-quick-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top: var(--space-xs);">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-quick-student" style="font-size: var(--font-xs); color: var(--color-primary);">Quick Demo: Alice Kumar (12601928)</button>
+        </div>
+
+        <footer class="dialog-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-auth-student">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-student-auth">Continue</button>
+        </footer>
+      </form>
+
+      <!-- ADMIN AUTH FORM -->
+      <form id="auth-form-admin" class="auth-form-pane" hidden novalidate>
+        <div class="form-field">
+          <label class="form-label" for="auth-admin-username">Admin Username</label>
+          <input type="text" id="auth-admin-username" name="username" placeholder="e.g. admin" autocomplete="username" required>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="auth-admin-passcode">Organizer Passcode</label>
+          <input type="password" id="auth-admin-passcode" name="passcode" placeholder="Enter administrative passcode" autocomplete="current-password" required>
+          <span class="form-hint">Demo Passcode: AEMS-Admin-2026</span>
+        </div>
+
+        <div class="auth-quick-actions" style="display:flex; justify-content:flex-start; align-items:center; margin-top: var(--space-xs);">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-quick-admin" style="font-size: var(--font-xs); color: var(--color-primary);">Quick Demo: Event Organizer</button>
+        </div>
+
+        <footer class="dialog-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-auth-admin">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-admin-auth">Sign In as Organizer</button>
+        </footer>
+      </form>
     </div>
-    <div id="auth-form-error" role="alert" hidden style="padding: 10px 12px; margin: 0 var(--space-xl); border-radius: 6px; background: #fee2e2; color: #b91c1c; font-size: 0.875rem; font-weight: 500;"></div>
-    <form id="auth-student-form" novalidate autocomplete="off" style="padding: var(--space-lg) var(--space-xl);">
-      <div class="form-field">
-        <label class="form-label" for="auth-student-id">Roll Number</label>
-        <input type="text" id="auth-student-id" maxlength="8" placeholder="e.g. 12601928" required autocomplete="off">
-      </div>
-      <div id="auth-new-student-fields" hidden>
-        <div class="form-field">
-          <label class="form-label" for="auth-student-name">Full Name</label>
-          <input type="text" id="auth-student-name" placeholder="e.g. Alice Kumar" maxlength="100" autocomplete="off">
-        </div>
-        <div class="form-field">
-          <label class="form-label" for="auth-student-email">University Email</label>
-          <input type="email" id="auth-student-email" placeholder="e.g. alice.kumar@example.edu" maxlength="150" autocomplete="off">
-        </div>
-        <div class="form-field">
-          <label class="form-label" for="auth-student-dept">Department</label>
-          <input type="text" id="auth-student-dept" placeholder="e.g. CSE" maxlength="80" autocomplete="off">
-        </div>
-      </div>
-      <footer class="dialog-footer" style="padding: var(--space-md) 0 0 0; border-top: none; background: transparent;">
-        <button type="submit" class="btn btn-primary" id="auth-student-submit">Continue</button>
-      </footer>
-      <div class="auth-quick-actions">
-        <button type="button" class="btn btn-ghost btn-sm" id="btn-quick-student">Quick Demo: Alice Kumar (12601928)</button>
-      </div>
-    </form>
-    <form id="auth-admin-form" novalidate autocomplete="off" hidden style="padding: var(--space-lg) var(--space-xl);">
-      <div class="form-field">
-        <label class="form-label" for="auth-admin-user">Username</label>
-        <input type="text" id="auth-admin-user" placeholder="admin" autocomplete="off">
-      </div>
-      <div class="form-field">
-        <label class="form-label" for="auth-admin-pass">Passcode</label>
-        <input type="password" id="auth-admin-pass" placeholder="AEMS-Admin-2026" autocomplete="off">
-      </div>
-      <footer class="dialog-footer" style="padding: var(--space-md) 0 0 0; border-top: none; background: transparent;">
-        <button type="submit" class="btn btn-primary">Sign In as Organizer</button>
-      </footer>
-      <div class="auth-quick-actions">
-        <button type="button" class="btn btn-ghost btn-sm" id="btn-quick-admin">Quick Demo: Event Organizer</button>
-      </div>
-    </form>
-  </div>
-</dialog>`;
-
+  </dialog>
+  `;
   document.body.insertAdjacentHTML("beforeend", markup);
-  bindAuthDialogEvents();
 };
 
-// ─── Error helpers ──────────────────────────────────────────────────────────
-
-const showAuthError = (msg) => {
-  const el = document.getElementById("auth-form-error");
-  if (el) {
-    el.textContent = msg;
-    el.hidden = false;
-  }
+const resolveRefs = () => {
+  ensureAuthDialog();
+  authDialog = document.getElementById(AUTH_DIALOG_ID);
+  tabStudent = document.getElementById("auth-tab-student");
+  tabAdmin = document.getElementById("auth-tab-admin");
+  formStudent = document.getElementById("auth-form-student");
+  formAdmin = document.getElementById("auth-form-admin");
+  studentIdInput = document.getElementById("auth-student-id");
+  studentNewFields = document.getElementById("auth-student-new-fields");
+  studentNameInput = document.getElementById("auth-student-name");
+  studentEmailInput = document.getElementById("auth-student-email");
+  studentDeptInput = document.getElementById("auth-student-dept");
+  adminUsernameInput = document.getElementById("auth-admin-username");
+  adminPasscodeInput = document.getElementById("auth-admin-passcode");
+  bannerError = document.getElementById("auth-banner-error");
+  bannerInfo = document.getElementById("auth-banner-info");
+  btnSubmitStudent = document.getElementById("btn-submit-student-auth");
 };
 
-const clearAuthError = () => {
-  const el = document.getElementById("auth-form-error");
-  if (el) {
-    el.textContent = "";
-    el.hidden = true;
-  }
-};
-
-// ─── Tab switching ──────────────────────────────────────────────────────────
-
-const switchAuthTab = (tab) => {
-  clearAuthError();
-  const studentTab = document.getElementById("auth-tab-student");
-  const adminTab = document.getElementById("auth-tab-admin");
-  const studentForm = document.getElementById("auth-student-form");
-  const adminForm = document.getElementById("auth-admin-form");
-
-  if (tab === "admin") {
-    if (studentTab) { studentTab.classList.remove("active"); studentTab.setAttribute("aria-selected", "false"); }
-    if (adminTab) { adminTab.classList.add("active"); adminTab.setAttribute("aria-selected", "true"); }
-    if (studentForm) studentForm.hidden = true;
-    if (adminForm) adminForm.hidden = false;
+const showBanner = (message, type = "error") => {
+  if (type === "error") {
+    if (bannerInfo) bannerInfo.hidden = true;
+    if (bannerError) {
+      bannerError.textContent = message;
+      bannerError.hidden = false;
+    }
   } else {
-    if (adminTab) { adminTab.classList.remove("active"); adminTab.setAttribute("aria-selected", "false"); }
-    if (studentTab) { studentTab.classList.add("active"); studentTab.setAttribute("aria-selected", "true"); }
-    if (adminForm) adminForm.hidden = true;
-    if (studentForm) studentForm.hidden = false;
+    if (bannerError) bannerError.hidden = true;
+    if (bannerInfo) {
+      bannerInfo.textContent = message;
+      bannerInfo.hidden = false;
+    }
   }
 };
 
-// ─── Student auto-detection login logic ───────────────────────────────────
+const clearBanners = () => {
+  if (bannerError) {
+    bannerError.textContent = "";
+    bannerError.hidden = true;
+  }
+  if (bannerInfo) {
+    bannerInfo.textContent = "";
+    bannerInfo.hidden = true;
+  }
+};
+
+const switchTab = (targetRole = "student") => {
+  clearBanners();
+  const isStudent = targetRole === "student";
+  if (tabStudent) {
+    tabStudent.classList.toggle("active", isStudent);
+    tabStudent.setAttribute("aria-selected", isStudent ? "true" : "false");
+  }
+  if (tabAdmin) {
+    tabAdmin.classList.toggle("active", !isStudent);
+    tabAdmin.setAttribute("aria-selected", !isStudent ? "true" : "false");
+  }
+  if (formStudent) formStudent.hidden = !isStudent;
+  if (formAdmin) formAdmin.hidden = isStudent;
+
+  if (isStudent && studentIdInput) {
+    setTimeout(() => studentIdInput.focus(), 50);
+  } else if (!isStudent && adminPasscodeInput) {
+    setTimeout(() => adminPasscodeInput.focus(), 50);
+  }
+};
+
+const checkStudentInputState = () => {
+  const val = studentIdInput ? studentIdInput.value.trim() : "";
+  clearBanners();
+
+  // If user edits roll, collapse step 2
+  if (!ROLL_REGEX.test(val)) {
+    if (studentNewFields) studentNewFields.hidden = true;
+    if (btnSubmitStudent) btnSubmitStudent.textContent = "Continue";
+    return;
+  }
+
+  const knownList = StorageService.getKnownStudents();
+  const matched = knownList.find((s) => s.studentId === val);
+
+  if (matched) {
+    if (studentNewFields) studentNewFields.hidden = true;
+    showBanner(`Recognized student: ${matched.name} (${matched.department})`, "info");
+    if (btnSubmitStudent) btnSubmitStudent.textContent = `Sign In as ${matched.name.split(" ")[0]}`;
+  } else {
+    if (studentNewFields) studentNewFields.hidden = false;
+    showBanner("New Roll Number detected. Please complete your profile to continue.", "info");
+    if (btnSubmitStudent) btnSubmitStudent.textContent = "Complete Sign Up & Login";
+  }
+};
 
 const handleStudentSubmit = (e) => {
   e.preventDefault();
-  clearAuthError();
+  clearBanners();
 
-  const studentIdInput = document.getElementById("auth-student-id");
-  const studentId = (studentIdInput?.value || "").trim();
+  const studentId = studentIdInput ? studentIdInput.value.trim() : "";
 
-  // Step 1: Validate 126xxxxx format
   if (!ROLL_REGEX.test(studentId)) {
-    showAuthError("Roll Number must start with 126 and be exactly 8 digits (e.g. 12601928).");
+    showBanner("Roll Number must start with 126 and be exactly 8 digits (e.g. 12601928).", "error");
+    if (studentIdInput) studentIdInput.focus();
     return;
   }
 
-  const newFieldsContainer = document.getElementById("auth-new-student-fields");
-  const isNewFieldsVisible = newFieldsContainer && !newFieldsContainer.hidden;
+  const knownList = StorageService.getKnownStudents();
+  let student = knownList.find((s) => s.studentId === studentId);
 
-  // Step 2: Check if student exists in known students or registrations
-  const knownStudents = StorageService.getKnownStudents();
-  const registrations = StorageService.getRegistrations();
-  const knownMatch = knownStudents.find((s) => s.studentId === studentId);
-  const regMatch = registrations.find((r) => r.studentId === studentId);
-  const studentExists = Boolean(knownMatch || regMatch);
-
-  // Step 3: If found — log in immediately
-  if (studentExists) {
-    const name = knownMatch?.name || regMatch?.name || studentId;
-    StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name });
-    StorageService.setActiveRole("student");
-    StorageService.setActiveStudentId(studentId);
-    closeAuthModal();
-    refreshApp();
-    if (typeof window.showToast === "function") {
-      window.showToast(`Welcome back, ${name}!`, "success");
+  // If new student, reveal and validate step 2 fields
+  if (!student) {
+    if (studentNewFields && studentNewFields.hidden) {
+      studentNewFields.hidden = false;
+      showBanner("New Roll Number detected. Please complete your profile to continue.", "info");
+      if (btnSubmitStudent) btnSubmitStudent.textContent = "Complete Sign Up & Login";
+      if (studentNameInput) studentNameInput.focus();
+      return;
     }
-    if (typeof pendingCallback === "function") {
-      try { pendingCallback(); } catch (_err) {}
-      pendingCallback = null;
+
+    const name = studentNameInput ? studentNameInput.value.trim() : "";
+    const email = studentEmailInput ? studentEmailInput.value.trim() : "";
+    const department = studentDeptInput ? studentDeptInput.value.trim() : "";
+
+    if (!name || name.length < 2) {
+      showBanner("Please provide your full student name.", "error");
+      if (studentNameInput) studentNameInput.focus();
+      return;
     }
-    return;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showBanner("Please enter a valid university email address.", "error");
+      if (studentEmailInput) studentEmailInput.focus();
+      return;
+    }
+    if (!department || department.length < 2) {
+      showBanner("Please specify your department (e.g. CSE).", "error");
+      if (studentDeptInput) studentDeptInput.focus();
+      return;
+    }
+
+    // Duplicate email check
+    const emailDup = knownList.some((s) => s.email.toLowerCase() === email.toLowerCase());
+    if (emailDup) {
+      showBanner("This email address is already associated with another student.", "error");
+      if (studentEmailInput) studentEmailInput.focus();
+      return;
+    }
+
+    student = { studentId, name, email, department };
+    StorageService.saveKnownStudent(student);
   }
 
-  // Step 4: New student — show profile fields if hidden
-  if (!isNewFieldsVisible) {
-    if (newFieldsContainer) newFieldsContainer.hidden = false;
-    const nameField = document.getElementById("auth-student-name");
-    if (nameField) nameField.focus();
-    const submitBtn = document.getElementById("auth-student-submit");
-    if (submitBtn) submitBtn.textContent = "Complete Sign Up & Login";
-    showAuthError("New Roll Number detected. Please complete your profile to continue.");
-    return;
-  }
-
-  // Step 5: New student — validate and save
-  const nameVal = (document.getElementById("auth-student-name")?.value || "").trim();
-  const emailVal = (document.getElementById("auth-student-email")?.value || "").trim();
-  const deptVal = (document.getElementById("auth-student-dept")?.value || "").trim();
-
-  if (!nameVal) { showAuthError("Full Name is required."); return; }
-  if (!emailVal || !emailVal.includes("@")) { showAuthError("A valid University Email is required."); return; }
-  if (!deptVal) { showAuthError("Department is required."); return; }
-
-  // Check duplicate email across known students and registrations
-  const emailLower = emailVal.toLowerCase();
-  const emailDup = knownStudents.some((s) => (s.email || "").toLowerCase() === emailLower) ||
-    registrations.some((r) => (r.email || "").toLowerCase() === emailLower);
-  if (emailDup) {
-    showAuthError("This email address is already associated with another student.");
-    return;
-  }
-
-  // Save new student
-  StorageService.saveKnownStudent({ studentId, name: nameVal, email: emailVal, department: deptVal });
-
-  // Authenticate
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name: nameVal });
+  // Set session and authenticate
+  const session = {
+    authenticated: true,
+    role: "student",
+    studentId: student.studentId,
+    name: student.name,
+  };
+  StorageService.setAuthSession(session);
   StorageService.setActiveRole("student");
-  StorageService.setActiveStudentId(studentId);
+  StorageService.setActiveStudentId(student.studentId);
+
   closeAuthModal();
-  refreshApp();
   if (typeof window.showToast === "function") {
-    window.showToast(`Welcome, ${nameVal}! Your profile has been created.`, "success");
+    window.showToast(`Welcome, ${student.name}!`, "success");
   }
+
+  if (window.app && typeof window.app.refreshAllModules === "function") {
+    window.app.refreshAllModules("student");
+  }
+
   if (typeof pendingCallback === "function") {
-    try { pendingCallback(); } catch (_err) {}
+    const cb = pendingCallback;
     pendingCallback = null;
+    cb();
   }
 };
-
-// ─── Admin login logic ──────────────────────────────────────────────────────
 
 const handleAdminSubmit = (e) => {
   e.preventDefault();
-  clearAuthError();
+  clearBanners();
 
-  const username = (document.getElementById("auth-admin-user")?.value || "").trim().toLowerCase();
-  const passcode = document.getElementById("auth-admin-pass")?.value || "";
+  const user = adminUsernameInput ? adminUsernameInput.value.trim() : "";
+  const pass = adminPasscodeInput ? adminPasscodeInput.value.trim() : "";
 
-  if (username !== ADMIN_USER || passcode !== ADMIN_PASS) {
-    showAuthError("Invalid organizer credentials. Use admin / AEMS-Admin-2026.");
+  if (user.toLowerCase() !== ADMIN_USER.toLowerCase() || pass !== ADMIN_PASS) {
+    showBanner("Invalid organizer credentials. Use admin / AEMS-Admin-2026.", "error");
+    if (adminPasscodeInput) {
+      adminPasscodeInput.value = "";
+      adminPasscodeInput.focus();
+    }
     return;
   }
 
-  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null, name: "Event Organizer" });
+  const session = {
+    authenticated: true,
+    role: "admin",
+    studentId: null,
+    name: "Organizer / Administrator",
+  };
+  StorageService.setAuthSession(session);
   StorageService.setActiveRole("admin");
+
   closeAuthModal();
-  if (typeof window.app?.applyRole === "function") {
-    window.app.applyRole("admin");
-  }
   if (typeof window.showToast === "function") {
-    window.showToast("Signed in as Event Organizer.", "success");
+    window.showToast("Organizer access verified.", "success");
   }
+
+  if (window.app && typeof window.app.applyRole === "function") {
+    window.app.applyRole("admin");
+  } else if (window.app && typeof window.app.refreshAllModules === "function") {
+    window.app.refreshAllModules("admin");
+  }
+
   if (typeof pendingCallback === "function") {
-    try { pendingCallback(); } catch (_err) {}
+    const cb = pendingCallback;
     pendingCallback = null;
+    cb();
   }
 };
-
-// ─── Roll Number input listener (reset new-student fields on edit) ────────
-
-const bindRollInputReset = () => {
-  const input = document.getElementById("auth-student-id");
-  if (!input) return;
-  input.addEventListener("input", () => {
-    const newFields = document.getElementById("auth-new-student-fields");
-    if (newFields && !newFields.hidden) {
-      newFields.hidden = true;
-      const submitBtn = document.getElementById("auth-student-submit");
-      if (submitBtn) submitBtn.textContent = "Continue";
-      clearAuthError();
-    }
-  });
-};
-
-// ─── Quick demo buttons ──────────────────────────────────────────────────
-
-const bindQuickDemoButtons = () => {
-  const quickStudent = document.getElementById("btn-quick-student");
-  if (quickStudent) {
-    quickStudent.addEventListener("click", () => {
-      clearAuthError();
-      const studentId = "12601928";
-      StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name: "Alice Kumar" });
-      StorageService.setActiveRole("student");
-      StorageService.setActiveStudentId(studentId);
-      closeAuthModal();
-      refreshApp();
-      if (typeof window.showToast === "function") {
-        window.showToast("Welcome back, Alice Kumar!", "success");
-      }
-      if (typeof pendingCallback === "function") {
-        try { pendingCallback(); } catch (_err) {}
-        pendingCallback = null;
-      }
-    });
-  }
-
-  const quickAdmin = document.getElementById("btn-quick-admin");
-  if (quickAdmin) {
-    quickAdmin.addEventListener("click", () => {
-      clearAuthError();
-      StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null, name: "Event Organizer" });
-      StorageService.setActiveRole("admin");
-      closeAuthModal();
-      if (typeof window.app?.applyRole === "function") {
-        window.app.applyRole("admin");
-      }
-      if (typeof window.showToast === "function") {
-        window.showToast("Signed in as Event Organizer.", "success");
-      }
-      if (typeof pendingCallback === "function") {
-        try { pendingCallback(); } catch (_err) {}
-        pendingCallback = null;
-      }
-    });
-  }
-};
-
-// ─── Refresh app state after login ──────────────────────────────────────────
-
-const refreshApp = () => {
-  try {
-    const role = StorageService.getActiveRole() || "student";
-    if (typeof window.app?.refreshAllModules === "function") {
-      window.app.refreshAllModules(role);
-    }
-    if (typeof window.app?.updateProfileChip === "function") {
-      window.app.updateProfileChip(role);
-    }
-  } catch (_err) {}
-};
-
-// ─── Dialog event binding ──────────────────────────────────────────────────
-
-const bindAuthDialogEvents = () => {
-  const dialog = document.getElementById(AUTH_DIALOG_ID);
-  if (!dialog) return;
-
-  // Close button
-  const closeBtn = dialog.querySelector(".dialog-close");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => closeAuthModal());
-  }
-
-  // Backdrop click
-  dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) closeAuthModal();
-  });
-
-  // Native close event
-  dialog.addEventListener("close", () => {
-    clearAuthError();
-  });
-
-  // Tab switching
-  const studentTab = document.getElementById("auth-tab-student");
-  const adminTab = document.getElementById("auth-tab-admin");
-  if (studentTab) studentTab.addEventListener("click", () => switchAuthTab("student"));
-  if (adminTab) adminTab.addEventListener("click", () => switchAuthTab("admin"));
-
-  // Student form submit
-  const studentForm = document.getElementById("auth-student-form");
-  if (studentForm) studentForm.addEventListener("submit", handleStudentSubmit);
-
-  // Admin form submit
-  const adminForm = document.getElementById("auth-admin-form");
-  if (adminForm) adminForm.addEventListener("submit", handleAdminSubmit);
-
-  // Roll input reset
-  bindRollInputReset();
-
-  // Quick demo buttons
-  bindQuickDemoButtons();
-};
-
-// ─── Public API ─────────────────────────────────────────────────────────────
 
 const openAuthModal = (defaultTab = "student", onSuccess = null) => {
-  ensureAuthDialog();
-  clearAuthError();
-  pendingCallback = onSuccess || null;
+  resolveRefs();
+  if (!authDialog) return;
 
-  // Reset forms
-  const studentForm = document.getElementById("auth-student-form");
-  const adminForm = document.getElementById("auth-admin-form");
-  if (studentForm) studentForm.reset();
-  if (adminForm) adminForm.reset();
+  pendingCallback = onSuccess;
 
-  // Hide new student fields and reset button text
-  const newFields = document.getElementById("auth-new-student-fields");
-  if (newFields) newFields.hidden = true;
-  const submitBtn = document.getElementById("auth-student-submit");
-  if (submitBtn) submitBtn.textContent = "Continue";
+  if (formStudent) formStudent.reset();
+  if (formAdmin) formAdmin.reset();
+  if (studentNewFields) studentNewFields.hidden = true;
+  if (btnSubmitStudent) btnSubmitStudent.textContent = "Continue";
+  clearBanners();
 
-  switchAuthTab(defaultTab);
-
-  const dialog = document.getElementById(AUTH_DIALOG_ID);
-  if (dialog && typeof dialog.showModal === "function") {
-    dialog.showModal();
+  switchTab(defaultTab);
+  if (typeof authDialog.showModal === "function") {
+    authDialog.showModal();
   }
 };
 
 const closeAuthModal = () => {
-  clearAuthError();
-  const dialog = document.getElementById(AUTH_DIALOG_ID);
-  if (dialog && typeof dialog.close === "function") {
-    try { dialog.close(); } catch (_err) {}
+  if (authDialog && typeof authDialog.close === "function") {
+    authDialog.close();
   }
+  clearBanners();
 };
 
-const requireAuth = (requiredRole = "student", onSuccess = null) => {
+const requireAuth = (requiredRole, onSuccess) => {
   const session = StorageService.getAuthSession();
-  if (session.authenticated) {
-    if (requiredRole === "admin" && session.role !== "admin") {
-      openAuthModal("admin", onSuccess);
-      return;
-    }
-    // Already authenticated with the required role
-    if (typeof onSuccess === "function") {
-      try { onSuccess(); } catch (_err) {}
-    }
-    return;
+  if (session.authenticated && (requiredRole === "any" || session.role === requiredRole)) {
+    if (typeof onSuccess === "function") onSuccess();
+    return true;
   }
-  // Not authenticated — open the auth modal
-  const defaultTab = requiredRole === "admin" ? "admin" : "student";
-  openAuthModal(defaultTab, onSuccess);
+  openAuthModal(requiredRole === "admin" ? "admin" : "student", onSuccess);
+  return false;
 };
 
 const logout = () => {
   StorageService.clearAuthSession();
-  StorageService.setActiveRole("student");
-  refreshApp();
-  if (typeof window.app?.applyRole === "function") {
-    window.app.applyRole("student");
-  }
+  StorageService.setActiveRole("guest");
+  StorageService.setActiveStudentId("ALL");
+
   if (typeof window.showToast === "function") {
-    window.showToast("Signed out successfully.", "info");
+    window.showToast("Signed out. Switched to Guest Mode.", "info");
+  }
+
+  if (window.app && typeof window.app.refreshAllModules === "function") {
+    window.app.refreshAllModules("guest");
+  }
+  if (window.app && typeof window.app.showTab === "function") {
+    window.app.showTab("discover");
   }
 };
 
-const isAuthenticated = () => {
-  return StorageService.getAuthSession().authenticated === true;
-};
+const bindEvents = () => {
+  resolveRefs();
 
-const getCurrentRole = () => {
-  return StorageService.getAuthSession().role || "guest";
-};
+  if (tabStudent) tabStudent.addEventListener("click", () => switchTab("student"));
+  if (tabAdmin) tabAdmin.addEventListener("click", () => switchTab("admin"));
 
-const init = () => {
-  ensureAuthDialog();
+  if (studentIdInput) {
+    studentIdInput.addEventListener("input", checkStudentInputState);
+  }
+
+  if (formStudent) formStudent.addEventListener("submit", handleStudentSubmit);
+  if (formAdmin) formAdmin.addEventListener("submit", handleAdminSubmit);
+
+  const btnClose = document.getElementById("btn-close-auth");
+  if (btnClose) btnClose.addEventListener("click", closeAuthModal);
+  const btnCancelS = document.getElementById("btn-cancel-auth-student");
+  if (btnCancelS) btnCancelS.addEventListener("click", closeAuthModal);
+  const btnCancelA = document.getElementById("btn-cancel-auth-admin");
+  if (btnCancelA) btnCancelA.addEventListener("click", closeAuthModal);
+
+  // Quick Demo Buttons
+  const btnQuickStudent = document.getElementById("btn-quick-student");
+  if (btnQuickStudent) {
+    btnQuickStudent.addEventListener("click", () => {
+      if (studentIdInput) {
+        studentIdInput.value = "12601928";
+        checkStudentInputState();
+      }
+    });
+  }
+
+  const btnQuickAdmin = document.getElementById("btn-quick-admin");
+  if (btnQuickAdmin) {
+    btnQuickAdmin.addEventListener("click", () => {
+      if (adminUsernameInput) adminUsernameInput.value = "admin";
+      if (adminPasscodeInput) adminPasscodeInput.value = "AEMS-Admin-2026";
+    });
+  }
+
+  if (authDialog) {
+    authDialog.addEventListener("click", (e) => {
+      if (e.target === authDialog) closeAuthModal();
+    });
+    authDialog.addEventListener("close", () => {
+      clearBanners();
+    });
+  }
 };
 
 const AuthModule = {
-  init,
+  init: () => {
+    resolveRefs();
+    bindEvents();
+  },
   openAuthModal,
   closeAuthModal,
   requireAuth,
   logout,
-  isAuthenticated,
-  getCurrentRole,
+  isAuthenticated: () => StorageService.getAuthSession().authenticated,
+  getCurrentRole: () => StorageService.getAuthSession().role,
 };
 
+window.AuthModule = AuthModule;
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", AuthModule.init);
+} else {
+  AuthModule.init();
+}
+
 export default AuthModule;
-
-if (typeof window !== "undefined") {
-  window.AuthModule = AuthModule;
-}
-
-if (typeof document !== "undefined") {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-}
