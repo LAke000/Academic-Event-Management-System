@@ -237,7 +237,9 @@ const closeRegistrationModal = () => {
 const validateRegistration = (name, studentId, email, department) => {
   if (!name || name.trim() === "") return "Student Name is required.";
   if (!studentId || studentId.trim() === "") return "Student ID / Roll No. is required.";
-  if (!/^126\d{5}$/.test(studentId.trim())) return "Student ID / Roll No. must start with 126 and be 8 digits (e.g. 12601928).";
+  if (!/^126\d{5}$/.test(studentId.trim())) {
+    return "Student ID / Roll No. must start with 126 and be 8 digits (e.g. 12601928).";
+  }
   if (!email || email.trim() === "") return "University Email is required.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     return "Please enter a valid University Email (e.g. name@university.edu).";
@@ -1071,8 +1073,8 @@ const RegistrationModule = {
   openRegistrationModal,
   closeRegistrationModal,
   populateRegPresetSelect,
-  handleRegistrationSubmit,
   validateRegistration,
+  handleRegistrationSubmit,
   renderPasses,
   showPassQR,
   cancelRegistration,
