@@ -1441,8 +1441,7 @@ input[type="radio"] {
   color: var(--color-surface);
 }
 
-body.role-guest .admin-only,
-body.role-guest .student-only {
+body.role-guest .admin-only {
   display: none !important;
 }
 

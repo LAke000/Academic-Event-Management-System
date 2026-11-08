@@ -300,8 +300,10 @@ const renderDiscover = () => {
     parent.insertBefore(bannerEl, discoverContainer);
   }
 
+  const session = StorageService.getAuthSession();
+  const isAuthStudent = session.authenticated || !window.AuthModule;
   const activeStudentId = StorageService.getActiveStudentId();
-  const regs = activeStudentId && activeStudentId !== "ALL"
+  const regs = isAuthStudent && activeStudentId && activeStudentId !== "ALL"
     ? StorageService.getRegistrations().filter((r) => r.studentId === activeStudentId)
     : StorageService.getRegistrations();
   const registeredEventIds = new Set(regs.map((r) => r.eventId));
@@ -359,7 +361,7 @@ const renderDiscover = () => {
     // Check if the active student is already registered for this event.
     const activeStudentId = StorageService.getActiveStudentId();
     const activeReg =
-      activeStudentId && activeStudentId !== "ALL"
+      isAuthStudent && activeStudentId && activeStudentId !== "ALL"
         ? allEventRegs.find((r) => r.studentId === activeStudentId)
         : null;
     const alreadyRegistered = Boolean(activeReg);
@@ -1143,10 +1145,8 @@ const openRegistrationModal = async (eventId) => {
 
   const session = StorageService.getAuthSession();
   if (!session.authenticated && StorageService.getActiveRole() !== "admin") {
-    if (window.AuthModule) {
-      window.AuthModule.requireAuth("student", () => {
-        openRegistrationModal(eventId);
-      });
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("student", () => openRegistrationModal(eventId));
       return;
     }
   }

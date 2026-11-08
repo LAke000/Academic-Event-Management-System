@@ -10,7 +10,7 @@ import { formatDate } from "./utils.js";
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
-const DEFAULT_ROLE = "guest";
+const DEFAULT_ROLE = "student";
 const DEFAULT_VIEW_GUEST = "discover";
 const DEFAULT_VIEW_STUDENT = "discover";
 const DEFAULT_VIEW_ADMIN = "dashboard";
@@ -173,13 +173,14 @@ window.showToast = (message, type = "info") => {
 // ─── Role switcher ─────────────────────────────────────────────────────────
 
 const setBodyRole = (role) => {
+  const session = StorageService.getAuthSession();
+  const effectiveRole = (!session.authenticated && role !== "admin") ? "student" : role;
   document.body.classList.remove("role-student", "role-admin", "role-guest");
-  document.body.classList.add(`role-${role}`);
+  document.body.classList.add(`role-${effectiveRole}`);
 };
 
 const toggleAdminTabs = (role) => {
   const isAdmin = role === "admin";
-  const isGuest = role === "guest";
 
   document.querySelectorAll("#sidebar-nav .nav-link[data-tab]").forEach((link) => {
     const tab = link.dataset.tab;
@@ -193,8 +194,7 @@ const toggleAdminTabs = (role) => {
         link.removeAttribute("aria-hidden");
       }
     } else if (STUDENT_TABS.includes(tab)) {
-      const isPublic = tab === "discover";
-      const showTab = !isAdmin && (isPublic || !isGuest);
+      const showTab = !isAdmin;
       link.hidden = !showTab;
       link.style.display = showTab ? "" : "none";
       if (!showTab) {
@@ -326,22 +326,30 @@ const updateProfileChip = (role) => {
   const chipStatus = document.getElementById("chip-status");
   const chipAvatar = document.getElementById("chip-avatar");
   const btnAuthAction = document.getElementById("btn-auth-action");
+  let switcher = document.getElementById("student-switcher");
 
-  if (btnAuthAction) {
-    btnAuthAction.textContent = session.authenticated ? "Sign Out" : "Sign In";
-    btnAuthAction.className = session.authenticated ? "btn btn-ghost btn-sm" : "btn btn-outline btn-sm";
-  }
-
-  if (!session.authenticated || role === "guest") {
+  if (!session.authenticated) {
     if (chipName) chipName.textContent = "Guest Mode";
+    if (chipStatus) chipStatus.textContent = "Sign in to register";
     if (chipAvatar) {
       chipAvatar.textContent = "G";
       chipAvatar.className = "chip-avatar chip-avatar--guest";
     }
-    if (chipStatus) chipStatus.textContent = "Sign in to register";
-    const switcher = document.getElementById("student-switcher");
-    if (switcher) switcher.style.display = "none";
+    if (btnAuthAction) {
+      btnAuthAction.textContent = "Sign In";
+      btnAuthAction.className = "btn btn-outline btn-sm";
+    }
+    if (switcher) {
+      switcher.hidden = true;
+      switcher.style.display = "none";
+    }
     return;
+  }
+
+  // Authenticated
+  if (btnAuthAction) {
+    btnAuthAction.textContent = "Sign Out";
+    btnAuthAction.className = "btn btn-ghost btn-sm";
   }
 
   if (role === "admin") {
@@ -351,22 +359,54 @@ const updateProfileChip = (role) => {
       chipAvatar.className = "chip-avatar";
     }
     if (chipStatus) chipStatus.textContent = "Organizer access enabled";
-    const switcher = document.getElementById("student-switcher");
-    if (switcher) switcher.style.display = "none";
+    if (switcher) {
+      switcher.hidden = true;
+      switcher.style.display = "none";
+    }
   } else {
+    // role === "student"
     refreshStudentSwitcher("student");
+    switcher = document.getElementById("student-switcher");
+    if (switcher) {
+      switcher.hidden = false;
+      switcher.style.display = "";
+    }
+
     const activeId = StorageService.getActiveStudentId();
     const student = StorageService.getKnownStudents().find((s) => s.studentId === activeId);
-    const displayName = student ? `${student.name} (${student.studentId})` : `Student (${activeId})`;
+    const displayName =
+      activeId === "ALL"
+        ? "All Demo Students"
+        : student
+        ? `${student.name} (${student.studentId})`
+        : `Student (${activeId})`;
 
     if (chipName) chipName.textContent = displayName;
     if (chipAvatar) {
-      chipAvatar.textContent = student ? student.name.charAt(0).toUpperCase() : "S";
+      chipAvatar.textContent =
+        activeId === "ALL"
+          ? "S"
+          : student
+          ? student.name.charAt(0).toUpperCase()
+          : "S";
       chipAvatar.className = "chip-avatar";
     }
-    const regs = StorageService.getRegistrationsByStudent(activeId);
+
+    const allRegs = StorageService.getRegistrations();
+    const studentRegs =
+      activeId === "ALL"
+        ? allRegs
+        : allRegs.filter((r) => r.studentId === activeId);
+    const activeRegs = studentRegs.filter(
+      (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
+    );
+    const count = activeRegs.length;
+
     if (chipStatus) {
-      chipStatus.textContent = `Registered for ${regs.length} event(s)`;
+      chipStatus.textContent =
+        count > 0
+          ? `Registered for ${count} event(s)`
+          : "Not registered for any event";
     }
   }
 };
@@ -399,7 +439,7 @@ const applyRole = (role, targetTab = null) => {
   }
 
   setBodyRole(role);
-  toggleAdminTabs(isAdmin);
+  toggleAdminTabs(role);
   updateProfileChip(role);
 
   const seedTop = document.getElementById("btn-seed-data");
@@ -422,23 +462,18 @@ const bindRoleToggle = () => {
   const toggle = document.getElementById("role-toggle");
   if (!toggle) return;
 
-  toggle.addEventListener("click", (e) => {
+  toggle.addEventListener("change", () => {
     const session = StorageService.getAuthSession();
-    const willBeAdmin = toggle.checked;
-
-    if (willBeAdmin && (!session.authenticated || session.role !== "admin")) {
-      e.preventDefault();
+    if (toggle.checked && session.role !== "admin") {
       toggle.checked = false;
-      if (window.AuthModule) {
-        window.AuthModule.requireAuth("admin", () => {
-          toggle.checked = true;
-          applyRole("admin", "dashboard");
-        });
+      toggle.setAttribute("aria-checked", "false");
+      if (typeof window.AuthModule?.requireAuth === "function") {
+        window.AuthModule.requireAuth("admin", () => applyRole("admin"));
       }
       return;
     }
 
-    if (!willBeAdmin && session.authenticated && session.role === "admin") {
+    if (!toggle.checked && session.authenticated && session.role === "admin") {
       applyRole(session.studentId ? "student" : "guest");
     }
   });
@@ -457,27 +492,26 @@ function showTab(tabId) {
   const session = StorageService.getAuthSession();
 
   // Route Interception: Admin Tabs
-  if (ADMIN_TABS.includes(tabId)) {
-    if (!session.authenticated || session.role !== "admin") {
-      if (window.AuthModule) {
-        window.AuthModule.requireAuth("admin", () => {
-          applyRole("admin", tabId);
-        });
-      }
-      return;
+  if (
+    ADMIN_TABS.includes(tabId) &&
+    StorageService.getActiveRole() !== "admin" &&
+    session.role !== "admin"
+  ) {
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("admin", () => applyRole("admin", tabId));
     }
+    return;
   }
 
   // Route Interception: Protected Student Tabs
-  if (PROTECTED_STUDENT_TABS.includes(tabId)) {
-    if (!session.authenticated || session.role !== "student") {
-      if (window.AuthModule) {
-        window.AuthModule.requireAuth("student", () => {
-          showTab(tabId);
-        });
-      }
-      return;
+  if (
+    (tabId === "passes" || tabId === "history" || PROTECTED_STUDENT_TABS.includes(tabId)) &&
+    !session.authenticated
+  ) {
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("student", () => showTab(tabId));
     }
+    return;
   }
 
   try {

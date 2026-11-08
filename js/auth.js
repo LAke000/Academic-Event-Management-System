@@ -23,6 +23,7 @@ let adminPasscodeInput = null;
 let bannerError = null;
 let bannerInfo = null;
 let btnSubmitStudent = null;
+let studentHint = null;
 
 let pendingCallback = null;
 
@@ -38,22 +39,22 @@ const ensureAuthDialog = () => {
       </header>
 
       <div class="auth-tabs" role="tablist">
-        <button type="button" class="auth-tab-btn active" id="auth-tab-student" role="tab" aria-selected="true">Student Portal</button>
-        <button type="button" class="auth-tab-btn" id="auth-tab-admin" role="tab" aria-selected="false">Organizer / Admin</button>
+        <button type="button" class="auth-tab auth-tab-btn active" id="auth-tab-student" role="tab" aria-selected="true">Student Portal</button>
+        <button type="button" class="auth-tab auth-tab-btn" id="auth-tab-admin" role="tab" aria-selected="false">Organizer / Admin</button>
       </div>
 
-      <div id="auth-banner-error" class="auth-banner auth-banner--error" hidden role="alert"></div>
+      <div id="auth-form-error" class="auth-banner auth-banner--error" hidden role="alert"></div>
       <div id="auth-banner-info" class="auth-banner auth-banner--info" hidden role="status"></div>
 
       <!-- STUDENT AUTH FORM -->
-      <form id="auth-form-student" class="auth-form-pane" novalidate>
+      <form id="auth-student-form" class="auth-form-pane" novalidate>
         <div class="form-field">
           <label class="form-label" for="auth-student-id">Student ID / Roll Number</label>
           <input type="text" id="auth-student-id" name="studentId" placeholder="8-digit ID starting with 126 (e.g. 12601928)" maxlength="8" autocomplete="off" required>
           <span class="form-hint" id="auth-student-hint">Format: 8 digits starting with 126 (e.g. 12601928)</span>
         </div>
 
-        <div id="auth-student-new-fields" class="auth-step-fields" hidden>
+        <div id="auth-new-student-fields" class="auth-step-fields" hidden>
           <div class="auth-step-divider">
             <span>New Student Registration</span>
           </div>
@@ -77,19 +78,19 @@ const ensureAuthDialog = () => {
 
         <footer class="dialog-footer">
           <button type="button" class="btn btn-ghost" id="btn-cancel-auth-student">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-submit-student-auth">Continue</button>
+          <button type="submit" class="btn btn-primary" id="auth-student-submit">Continue</button>
         </footer>
       </form>
 
       <!-- ADMIN AUTH FORM -->
-      <form id="auth-form-admin" class="auth-form-pane" hidden novalidate>
+      <form id="auth-admin-form" class="auth-form-pane" hidden novalidate>
         <div class="form-field">
-          <label class="form-label" for="auth-admin-username">Admin Username</label>
-          <input type="text" id="auth-admin-username" name="username" placeholder="e.g. admin" autocomplete="username" required>
+          <label class="form-label" for="auth-admin-user">Admin Username</label>
+          <input type="text" id="auth-admin-user" name="username" placeholder="e.g. admin" autocomplete="username" required>
         </div>
         <div class="form-field">
-          <label class="form-label" for="auth-admin-passcode">Organizer Passcode</label>
-          <input type="password" id="auth-admin-passcode" name="passcode" placeholder="Enter administrative passcode" autocomplete="current-password" required>
+          <label class="form-label" for="auth-admin-pass">Organizer Passcode</label>
+          <input type="password" id="auth-admin-pass" name="passcode" placeholder="Enter administrative passcode" autocomplete="current-password" required>
           <span class="form-hint">Demo Passcode: AEMS-Admin-2026</span>
         </div>
 
@@ -113,151 +114,106 @@ const resolveRefs = () => {
   authDialog = document.getElementById(AUTH_DIALOG_ID);
   tabStudent = document.getElementById("auth-tab-student");
   tabAdmin = document.getElementById("auth-tab-admin");
-  formStudent = document.getElementById("auth-form-student");
-  formAdmin = document.getElementById("auth-form-admin");
+  bannerError = document.getElementById("auth-form-error") || document.getElementById("auth-banner-error");
+  bannerInfo = document.getElementById("auth-banner-info");
+
+  formStudent = document.getElementById("auth-student-form") || document.getElementById("auth-form-student");
   studentIdInput = document.getElementById("auth-student-id");
-  studentNewFields = document.getElementById("auth-student-new-fields");
+  studentHint = document.getElementById("auth-student-hint");
+  studentNewFields = document.getElementById("auth-new-student-fields") || document.getElementById("auth-student-new-fields");
   studentNameInput = document.getElementById("auth-student-name");
   studentEmailInput = document.getElementById("auth-student-email");
   studentDeptInput = document.getElementById("auth-student-dept");
-  adminUsernameInput = document.getElementById("auth-admin-username");
-  adminPasscodeInput = document.getElementById("auth-admin-passcode");
-  bannerError = document.getElementById("auth-banner-error");
-  bannerInfo = document.getElementById("auth-banner-info");
-  btnSubmitStudent = document.getElementById("btn-submit-student-auth");
+  btnSubmitStudent = document.getElementById("auth-student-submit") || document.getElementById("btn-submit-student-auth");
+
+  formAdmin = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin");
+  adminUsernameInput = document.getElementById("auth-admin-user") || document.getElementById("auth-admin-username");
+  adminPasscodeInput = document.getElementById("auth-admin-pass") || document.getElementById("auth-admin-passcode");
 };
 
 const showBanner = (message, type = "error") => {
-  if (type === "error") {
-    if (bannerInfo) bannerInfo.hidden = true;
-    if (bannerError) {
-      bannerError.textContent = message;
-      bannerError.hidden = false;
+  const errBanner = document.getElementById("auth-form-error") || document.getElementById("auth-banner-error");
+  const infoBanner = document.getElementById("auth-banner-info");
+
+  if (type === "info") {
+    if (infoBanner) {
+      infoBanner.textContent = message;
+      infoBanner.hidden = false;
+      infoBanner.style.display = "";
+    }
+    if (errBanner) {
+      errBanner.textContent = message;
+      errBanner.hidden = false;
+      errBanner.style.display = "";
+      errBanner.className = "auth-banner auth-banner--info";
     }
   } else {
-    if (bannerError) bannerError.hidden = true;
-    if (bannerInfo) {
-      bannerInfo.textContent = message;
-      bannerInfo.hidden = false;
+    if (infoBanner) {
+      infoBanner.textContent = "";
+      infoBanner.hidden = true;
+      infoBanner.style.display = "none";
+    }
+    if (errBanner) {
+      errBanner.textContent = message;
+      errBanner.hidden = false;
+      errBanner.style.display = "";
+      errBanner.className = "auth-banner auth-banner--error";
     }
   }
 };
 
 const clearBanners = () => {
-  if (bannerError) {
-    bannerError.textContent = "";
-    bannerError.hidden = true;
+  const errBanner = document.getElementById("auth-form-error") || document.getElementById("auth-banner-error");
+  const infoBanner = document.getElementById("auth-banner-info");
+  if (errBanner) {
+    errBanner.textContent = "";
+    errBanner.hidden = true;
+    errBanner.style.display = "none";
   }
-  if (bannerInfo) {
-    bannerInfo.textContent = "";
-    bannerInfo.hidden = true;
+  if (infoBanner) {
+    infoBanner.textContent = "";
+    infoBanner.hidden = true;
+    infoBanner.style.display = "none";
   }
 };
 
 const switchTab = (targetRole = "student") => {
   clearBanners();
   const isStudent = targetRole === "student";
-  if (tabStudent) {
-    tabStudent.classList.toggle("active", isStudent);
-    tabStudent.setAttribute("aria-selected", isStudent ? "true" : "false");
+  const tStudent = document.getElementById("auth-tab-student") || tabStudent;
+  const tAdmin = document.getElementById("auth-tab-admin") || tabAdmin;
+  const fStudent = document.getElementById("auth-student-form") || document.getElementById("auth-form-student") || formStudent;
+  const fAdmin = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin") || formAdmin;
+  const idInput = document.getElementById("auth-student-id") || studentIdInput;
+  const passInput = document.getElementById("auth-admin-pass") || document.getElementById("auth-admin-passcode") || adminPasscodeInput;
+
+  if (tStudent) {
+    tStudent.classList.toggle("active", isStudent);
+    tStudent.setAttribute("aria-selected", isStudent ? "true" : "false");
   }
-  if (tabAdmin) {
-    tabAdmin.classList.toggle("active", !isStudent);
-    tabAdmin.setAttribute("aria-selected", !isStudent ? "true" : "false");
+  if (tAdmin) {
+    tAdmin.classList.toggle("active", !isStudent);
+    tAdmin.setAttribute("aria-selected", !isStudent ? "true" : "false");
   }
-  if (formStudent) formStudent.hidden = !isStudent;
-  if (formAdmin) formAdmin.hidden = isStudent;
+  if (fStudent) fStudent.hidden = !isStudent;
+  if (fAdmin) fAdmin.hidden = isStudent;
 
-  if (isStudent && studentIdInput) {
-    setTimeout(() => studentIdInput.focus(), 50);
-  } else if (!isStudent && adminPasscodeInput) {
-    setTimeout(() => adminPasscodeInput.focus(), 50);
-  }
-};
-
-const checkStudentInputState = () => {
-  const val = studentIdInput ? studentIdInput.value.trim() : "";
-  clearBanners();
-
-  // If user edits roll, collapse step 2
-  if (!ROLL_REGEX.test(val)) {
-    if (studentNewFields) studentNewFields.hidden = true;
-    if (btnSubmitStudent) btnSubmitStudent.textContent = "Continue";
-    return;
-  }
-
-  const knownList = StorageService.getKnownStudents();
-  const matched = knownList.find((s) => s.studentId === val);
-
-  if (matched) {
-    if (studentNewFields) studentNewFields.hidden = true;
-    showBanner(`Recognized student: ${matched.name} (${matched.department})`, "info");
-    if (btnSubmitStudent) btnSubmitStudent.textContent = `Sign In as ${matched.name.split(" ")[0]}`;
-  } else {
-    if (studentNewFields) studentNewFields.hidden = false;
-    showBanner("New Roll Number detected. Please complete your profile to continue.", "info");
-    if (btnSubmitStudent) btnSubmitStudent.textContent = "Complete Sign Up & Login";
+  if (isStudent && idInput && typeof idInput.focus === "function") {
+    setTimeout(() => idInput.focus(), 50);
+  } else if (!isStudent && passInput && typeof passInput.focus === "function") {
+    setTimeout(() => passInput.focus(), 50);
   }
 };
 
-const handleStudentSubmit = (e) => {
-  e.preventDefault();
+const handleStudentInput = () => {
+  const fields = document.getElementById("auth-new-student-fields") || document.getElementById("auth-student-new-fields");
+  if (fields) fields.hidden = true;
   clearBanners();
+  const submitBtn = document.getElementById("auth-student-submit") || document.getElementById("btn-submit-student-auth");
+  if (submitBtn) submitBtn.textContent = "Continue";
+};
 
-  const studentId = studentIdInput ? studentIdInput.value.trim() : "";
-
-  if (!ROLL_REGEX.test(studentId)) {
-    showBanner("Roll Number must start with 126 and be exactly 8 digits (e.g. 12601928).", "error");
-    if (studentIdInput) studentIdInput.focus();
-    return;
-  }
-
-  const knownList = StorageService.getKnownStudents();
-  let student = knownList.find((s) => s.studentId === studentId);
-
-  // If new student, reveal and validate step 2 fields
-  if (!student) {
-    if (studentNewFields && studentNewFields.hidden) {
-      studentNewFields.hidden = false;
-      showBanner("New Roll Number detected. Please complete your profile to continue.", "info");
-      if (btnSubmitStudent) btnSubmitStudent.textContent = "Complete Sign Up & Login";
-      if (studentNameInput) studentNameInput.focus();
-      return;
-    }
-
-    const name = studentNameInput ? studentNameInput.value.trim() : "";
-    const email = studentEmailInput ? studentEmailInput.value.trim() : "";
-    const department = studentDeptInput ? studentDeptInput.value.trim() : "";
-
-    if (!name || name.length < 2) {
-      showBanner("Please provide your full student name.", "error");
-      if (studentNameInput) studentNameInput.focus();
-      return;
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showBanner("Please enter a valid university email address.", "error");
-      if (studentEmailInput) studentEmailInput.focus();
-      return;
-    }
-    if (!department || department.length < 2) {
-      showBanner("Please specify your department (e.g. CSE).", "error");
-      if (studentDeptInput) studentDeptInput.focus();
-      return;
-    }
-
-    // Duplicate email check
-    const emailDup = knownList.some((s) => s.email.toLowerCase() === email.toLowerCase());
-    if (emailDup) {
-      showBanner("This email address is already associated with another student.", "error");
-      if (studentEmailInput) studentEmailInput.focus();
-      return;
-    }
-
-    student = { studentId, name, email, department };
-    StorageService.saveKnownStudent(student);
-  }
-
-  // Set session and authenticate
+const loginStudent = (student) => {
   const session = {
     authenticated: true,
     role: "student",
@@ -273,7 +229,9 @@ const handleStudentSubmit = (e) => {
     window.showToast(`Welcome, ${student.name}!`, "success");
   }
 
-  if (window.app && typeof window.app.refreshAllModules === "function") {
+  if (window.app && typeof window.app.applyRole === "function") {
+    window.app.applyRole("student");
+  } else if (window.app && typeof window.app.refreshAllModules === "function") {
     window.app.refreshAllModules("student");
   }
 
@@ -284,18 +242,106 @@ const handleStudentSubmit = (e) => {
   }
 };
 
-const handleAdminSubmit = (e) => {
-  e.preventDefault();
+const handleStudentSubmit = (e) => {
+  if (e && typeof e.preventDefault === "function") e.preventDefault();
   clearBanners();
 
-  const user = adminUsernameInput ? adminUsernameInput.value.trim() : "";
-  const pass = adminPasscodeInput ? adminPasscodeInput.value.trim() : "";
+  const idInput = document.getElementById("auth-student-id") || studentIdInput;
+  const studentId = idInput ? idInput.value.trim() : "";
+
+  if (!ROLL_REGEX.test(studentId)) {
+    showBanner("Roll Number must start with 126 and be exactly 8 digits (e.g. 12601928).", "error");
+    if (idInput && typeof idInput.focus === "function") idInput.focus();
+    return;
+  }
+
+  const knownList = StorageService.getKnownStudents();
+  const regList = StorageService.getRegistrations();
+
+  let student = knownList.find((s) => s.studentId === studentId);
+  if (!student) {
+    const regStudent = regList.find((r) => r.studentId === studentId && r.name);
+    if (regStudent) {
+      student = {
+        studentId: regStudent.studentId,
+        name: regStudent.name,
+        email: regStudent.email || "",
+        department: regStudent.department || "General",
+      };
+    }
+  }
+
+  if (student) {
+    loginStudent(student);
+    return;
+  }
+
+  const fields = document.getElementById("auth-new-student-fields") || document.getElementById("auth-student-new-fields");
+  const submitBtn = document.getElementById("auth-student-submit") || document.getElementById("btn-submit-student-auth");
+
+  if (fields && fields.hidden) {
+    fields.hidden = false;
+    if (submitBtn) submitBtn.textContent = "Complete Sign Up & Login";
+    showBanner("New Roll Number detected. Please complete your profile to continue.", "info");
+    const nameInput = document.getElementById("auth-student-name");
+    if (nameInput && typeof nameInput.focus === "function") nameInput.focus();
+    return;
+  }
+
+  const nameInput = document.getElementById("auth-student-name") || studentNameInput;
+  const emailInput = document.getElementById("auth-student-email") || studentEmailInput;
+  const deptInput = document.getElementById("auth-student-dept") || studentDeptInput;
+
+  const name = nameInput ? nameInput.value.trim() : "";
+  const email = emailInput ? emailInput.value.trim() : "";
+  const department = deptInput ? deptInput.value.trim() : "";
+
+  if (!name || name.length < 2) {
+    showBanner("Please provide your full student name.", "error");
+    if (nameInput && typeof nameInput.focus === "function") nameInput.focus();
+    return;
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showBanner("Please enter a valid university email address.", "error");
+    if (emailInput && typeof emailInput.focus === "function") emailInput.focus();
+    return;
+  }
+  if (!department || department.length < 2) {
+    showBanner("Please specify your department (e.g. CSE).", "error");
+    if (deptInput && typeof deptInput.focus === "function") deptInput.focus();
+    return;
+  }
+
+  // Duplicate email check across BOTH knownStudents and registrations
+  const emailLower = email.toLowerCase();
+  const dupKnown = knownList.some((s) => s.email && s.email.toLowerCase() === emailLower);
+  const dupReg = regList.some((r) => r.email && r.email.toLowerCase() === emailLower);
+  if (dupKnown || dupReg) {
+    showBanner("This email address is already associated with another student.", "error");
+    if (emailInput && typeof emailInput.focus === "function") emailInput.focus();
+    return;
+  }
+
+  student = { studentId, name, email, department };
+  StorageService.saveKnownStudent(student);
+  loginStudent(student);
+};
+
+const handleAdminSubmit = (e) => {
+  if (e && typeof e.preventDefault === "function") e.preventDefault();
+  clearBanners();
+
+  const userInput = document.getElementById("auth-admin-user") || document.getElementById("auth-admin-username") || adminUsernameInput;
+  const passInput = document.getElementById("auth-admin-pass") || document.getElementById("auth-admin-passcode") || adminPasscodeInput;
+
+  const user = userInput ? userInput.value.trim() : "";
+  const pass = passInput ? passInput.value.trim() : "";
 
   if (user.toLowerCase() !== ADMIN_USER.toLowerCase() || pass !== ADMIN_PASS) {
     showBanner("Invalid organizer credentials. Use admin / AEMS-Admin-2026.", "error");
-    if (adminPasscodeInput) {
-      adminPasscodeInput.value = "";
-      adminPasscodeInput.focus();
+    if (passInput) {
+      passInput.value = "";
+      if (typeof passInput.focus === "function") passInput.focus();
     }
     return;
   }
@@ -333,10 +379,15 @@ const openAuthModal = (defaultTab = "student", onSuccess = null) => {
 
   pendingCallback = onSuccess;
 
-  if (formStudent) formStudent.reset();
-  if (formAdmin) formAdmin.reset();
-  if (studentNewFields) studentNewFields.hidden = true;
-  if (btnSubmitStudent) btnSubmitStudent.textContent = "Continue";
+  const fStudent = document.getElementById("auth-student-form") || document.getElementById("auth-form-student");
+  const fAdmin = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin");
+  const fields = document.getElementById("auth-new-student-fields") || document.getElementById("auth-student-new-fields");
+  const submitBtn = document.getElementById("auth-student-submit") || document.getElementById("btn-submit-student-auth");
+
+  if (fStudent && typeof fStudent.reset === "function") fStudent.reset();
+  if (fAdmin && typeof fAdmin.reset === "function") fAdmin.reset();
+  if (fields) fields.hidden = true;
+  if (submitBtn) submitBtn.textContent = "Continue";
   clearBanners();
 
   switchTab(defaultTab);
@@ -385,12 +436,16 @@ const bindEvents = () => {
   if (tabStudent) tabStudent.addEventListener("click", () => switchTab("student"));
   if (tabAdmin) tabAdmin.addEventListener("click", () => switchTab("admin"));
 
-  if (studentIdInput) {
-    studentIdInput.addEventListener("input", checkStudentInputState);
+  const idInput = document.getElementById("auth-student-id");
+  if (idInput) {
+    idInput.addEventListener("input", handleStudentInput);
   }
 
-  if (formStudent) formStudent.addEventListener("submit", handleStudentSubmit);
-  if (formAdmin) formAdmin.addEventListener("submit", handleAdminSubmit);
+  const fStudent = document.getElementById("auth-student-form") || document.getElementById("auth-form-student");
+  if (fStudent) fStudent.addEventListener("submit", handleStudentSubmit);
+
+  const fAdmin = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin");
+  if (fAdmin) fAdmin.addEventListener("submit", handleAdminSubmit);
 
   const btnClose = document.getElementById("btn-close-auth");
   if (btnClose) btnClose.addEventListener("click", closeAuthModal);
@@ -403,9 +458,19 @@ const bindEvents = () => {
   const btnQuickStudent = document.getElementById("btn-quick-student");
   if (btnQuickStudent) {
     btnQuickStudent.addEventListener("click", () => {
-      if (studentIdInput) {
-        studentIdInput.value = "12601928";
-        checkStudentInputState();
+      const studentInput = document.getElementById("auth-student-id");
+      if (studentInput) studentInput.value = "12601928";
+      const fields = document.getElementById("auth-new-student-fields") || document.getElementById("auth-student-new-fields");
+      if (fields) fields.hidden = true;
+      clearBanners();
+
+      const formSt = document.getElementById("auth-student-form") || document.getElementById("auth-form-student");
+      if (formSt) {
+        if (typeof formSt.requestSubmit === "function") {
+          formSt.requestSubmit();
+        } else {
+          formSt.dispatchEvent({ type: "submit", preventDefault() {} });
+        }
       }
     });
   }
@@ -413,8 +478,26 @@ const bindEvents = () => {
   const btnQuickAdmin = document.getElementById("btn-quick-admin");
   if (btnQuickAdmin) {
     btnQuickAdmin.addEventListener("click", () => {
-      if (adminUsernameInput) adminUsernameInput.value = "admin";
-      if (adminPasscodeInput) adminPasscodeInput.value = "AEMS-Admin-2026";
+      const u1 = document.getElementById("auth-admin-user");
+      const u2 = document.getElementById("auth-admin-username");
+      if (u1) u1.value = "admin";
+      if (u2) u2.value = "admin";
+
+      const p1 = document.getElementById("auth-admin-pass");
+      const p2 = document.getElementById("auth-admin-passcode");
+      if (p1) p1.value = ADMIN_PASS;
+      if (p2) p2.value = ADMIN_PASS;
+
+      clearBanners();
+
+      const formAd = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin");
+      if (formAd) {
+        if (typeof formAd.requestSubmit === "function") {
+          formAd.requestSubmit();
+        } else {
+          formAd.dispatchEvent({ type: "submit", preventDefault() {} });
+        }
+      }
     });
   }
 
@@ -443,10 +526,12 @@ const AuthModule = {
 
 window.AuthModule = AuthModule;
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", AuthModule.init);
-} else {
-  AuthModule.init();
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", AuthModule.init);
+  } else {
+    AuthModule.init();
+  }
 }
 
 export default AuthModule;

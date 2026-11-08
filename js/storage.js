@@ -141,6 +141,7 @@ class StorageService {
    * @returns {Array}
    */
   static getRegistrationsByStudent(studentId) {
+    if (studentId === "ALL") return this.getRegistrations();
     return this.getRegistrations().filter((r) => r.studentId === studentId);
   }
 
@@ -321,7 +322,13 @@ class StorageService {
    * @returns {boolean}
    */
   static clearAuthSession() {
-    return this._write(AUTH_SESSION_KEY, DEFAULT_AUTH_SESSION);
+    this.setActiveRole("student");
+    return this._write(AUTH_SESSION_KEY, {
+      authenticated: false,
+      role: "guest",
+      studentId: null,
+      name: null,
+    });
   }
 
   // ------------------------------------------------------------------
