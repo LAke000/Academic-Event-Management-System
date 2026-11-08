@@ -1135,17 +1135,20 @@ const resetCreateDialog = () => {
 // Lazily imports registration.js so a missing/broken sibling module cannot
 // crash the events catalog at load time.
 const openRegistrationModal = async (eventId) => {
-  if (!StorageService.getAuthSession().authenticated && StorageService.getActiveRole() !== "admin") {
-    if (typeof window.AuthModule?.requireAuth === "function") {
-      window.AuthModule.requireAuth("student", () => openRegistrationModal(eventId));
-      return;
-    }
-  }
-
   const event = StorageService.getEventById(eventId);
   if (!event) {
     window.showToast("Event not found.", "error");
     return;
+  }
+
+  const session = StorageService.getAuthSession();
+  if (!session.authenticated && StorageService.getActiveRole() !== "admin") {
+    if (window.AuthModule) {
+      window.AuthModule.requireAuth("student", () => {
+        openRegistrationModal(eventId);
+      });
+      return;
+    }
   }
 
   try {

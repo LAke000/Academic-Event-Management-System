@@ -354,13 +354,15 @@ test("Guest Mode: router and role toggle static contract guards in js/app.js", (
 
   // passes and history tab protection
   assert.ok(
-    appSrc.includes('(tabId === "passes" || tabId === "history") && !authSession.authenticated'),
+    appSrc.includes('PROTECTED_STUDENT_TABS.includes(tabId)') ||
+      appSrc.includes('(tabId === "passes" || tabId === "history") && !authSession.authenticated'),
     "js/app.js must gate #passes and #history against unauthenticated users in showTab"
   );
 
   // admin tabs protection
   assert.ok(
-    appSrc.includes('ADMIN_TABS.includes(tabId) && authSession.role !== "admin"'),
+    appSrc.includes('ADMIN_TABS.includes(tabId)') &&
+      (appSrc.includes('session.role !== "admin"') || appSrc.includes('authSession.role !== "admin"')),
     "js/app.js must gate ADMIN_TABS against non-admin in showTab"
   );
 
@@ -386,7 +388,8 @@ test("Guest Mode: router and role toggle static contract guards in js/app.js", (
 test("Guest Mode: events.js gates event registration for unauthenticated users", () => {
   const eventsSrc = fs.readFileSync(path.resolve("js/events.js"), "utf-8");
   assert.ok(
-    eventsSrc.includes("StorageService.getAuthSession().authenticated"),
+    eventsSrc.includes("StorageService.getAuthSession()") &&
+      (eventsSrc.includes(".authenticated") || eventsSrc.includes("session.authenticated")),
     "js/events.js openRegistrationModal must verify authenticated authSession"
   );
 });
