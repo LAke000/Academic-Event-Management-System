@@ -21,7 +21,7 @@
       <span class="brand-name">Academic Event Management System</span>
     </div>
     <div class="top-actions">
-      <label class="role-toggle" aria-label="Switch between Student Mode and Admin Mode">
+      <label class="role-toggle" id="role-toggle-wrap" aria-label="Switch between Student Mode and Admin Mode">
         <span class="toggle-label student-label">Student Mode</span>
         <input type="checkbox" id="role-toggle" class="toggle-input" role="switch" aria-checked="false">
         <span class="toggle-slider"></span>
@@ -30,11 +30,11 @@
       <button class="btn btn-ghost btn-sm admin-only" id="btn-seed-data" title="Load Demo Academic Data">
         <span class="btn-icon">&#128202;</span> Seed Demo Data
       </button>
-      <div class="profile-chip" id="profile-chip">
-        <span class="chip-avatar" id="chip-avatar">S</span>
+      <div class="profile-chip" id="profile-chip" style="cursor: pointer;" title="View session or switch profile">
+        <span class="chip-avatar" id="chip-avatar">G</span>
         <div class="chip-info">
-          <span class="chip-name" id="chip-name">Student Mode</span>
-          <span class="chip-status" id="chip-status">Not registered for any event</span>
+          <span class="chip-name" id="chip-name">Guest Mode</span>
+          <span class="chip-status" id="chip-status">Sign in to register</span>
         </div>
       </div>
       <button class="btn btn-outline btn-sm" id="btn-auth-action">Sign In</button>
@@ -571,13 +571,13 @@
   </dialog>
 
   <script type="module" src="js/storage.js"></script>
+  <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/events.js"></script>
   <script type="module" src="js/registration.js"></script>
   <script type="module" src="js/attendance.js"></script>
   <script type="module" src="js/feedback.js"></script>
   <script type="module" src="js/certificate.js"></script>
   <script type="module" src="js/reports.js"></script>
-  <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
