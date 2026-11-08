@@ -219,7 +219,7 @@ test("Capacity check ignores cancelled registrations during handleRegistrationSu
     {
       regId: "REG-OLD-1",
       eventId: "ev-cap-test",
-      studentId: "99999999",
+      studentId: "12699999",
       name: "Old Student",
       email: "old@university.edu",
       department: "CSE",
@@ -230,7 +230,7 @@ test("Capacity check ignores cancelled registrations during handleRegistrationSu
 
   mockElements["reg-event-id"].value = "ev-cap-test";
   mockElements["reg-student-name"].value = "New Student";
-  mockElements["reg-student-id"].value = "11111111";
+  mockElements["reg-student-id"].value = "12611111";
   mockElements["reg-email"].value = "new@university.edu";
   mockElements["reg-department"].value = "CSE";
 

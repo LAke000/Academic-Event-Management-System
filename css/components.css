@@ -1346,3 +1346,56 @@ input[type="radio"] {
   font-style: italic;
   color: var(--color-text-muted);
 }
+
+/* 10. Authentication Dialog */
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--color-border);
+  background-color: var(--color-surface-secondary);
+  padding: 0 var(--space-xl);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  text-align: center;
+}
+
+.auth-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.auth-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.auth-quick-actions {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+
+.auth-quick-actions .btn {
+  font-size: var(--font-xs);
+}
+
+#auth-dialog .form-field {
+  margin-bottom: var(--space-md);
+}
+
+#auth-dialog .dialog-footer {
+  margin-top: var(--space-sm);
+}

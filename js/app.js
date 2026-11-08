@@ -327,6 +327,20 @@ const updateProfileChip = (role) => {
   const chipName = document.getElementById("chip-name");
   const chipStatus = document.getElementById("chip-status");
   const chipAvatar = document.getElementById("chip-avatar");
+  const authBtn = document.getElementById("btn-auth-action");
+  const session = StorageService.getAuthSession();
+
+  if (!session.authenticated) {
+    if (chipName) chipName.textContent = "Guest Mode";
+    if (chipStatus) chipStatus.textContent = "Sign in to register";
+    if (chipAvatar) chipAvatar.textContent = "G";
+    if (authBtn) authBtn.textContent = "Sign In";
+    const switcher = document.getElementById("student-switcher");
+    if (switcher) { switcher.hidden = true; switcher.style.display = "none"; }
+    return;
+  }
+
+  if (authBtn) authBtn.textContent = "Sign Out";
 
   if (role === "admin") {
     if (chipName) chipName.textContent = "Admin Mode";
@@ -428,8 +442,26 @@ const bindRoleToggle = () => {
   const toggle = document.getElementById("role-toggle");
   if (!toggle) return;
   toggle.addEventListener("change", () => {
-    const newRole = toggle.checked ? "admin" : "student";
-    applyRole(newRole);
+    const session = StorageService.getAuthSession();
+    if (toggle.checked) {
+      if (session.role !== "admin") {
+        toggle.checked = false;
+        if (typeof window.AuthModule?.requireAuth === "function") {
+          window.AuthModule.requireAuth("admin", () => applyRole("admin"));
+        }
+        return;
+      }
+      applyRole("admin");
+    } else {
+      if (session.role === "admin") {
+        StorageService.setAuthSession({
+          authenticated: true,
+          role: "student",
+          studentId: StorageService.getActiveStudentId() || "12601928",
+        });
+      }
+      applyRole("student");
+    }
   });
 };
 
@@ -442,6 +474,20 @@ const bindRoleToggle = () => {
  */
 function showTab(tabId) {
   if (!tabId) return;
+
+  const authSession = StorageService.getAuthSession();
+  if ((tabId === "passes" || tabId === "history") && !authSession.authenticated) {
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("student", () => showTab(tabId));
+      return;
+    }
+  }
+  if (ADMIN_TABS.includes(tabId) && authSession.role !== "admin") {
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("admin", () => applyRole("admin", tabId));
+      return;
+    }
+  }
 
   // Update hash to preserve tab on F5 refresh
   try {
@@ -498,12 +544,18 @@ const bindRouter = () => {
         const tabId = link.dataset.tab;
         if (!tabId) return;
 
-        const role = StorageService.getActiveRole() || DEFAULT_ROLE;
-        if (ADMIN_TABS.includes(tabId) && role !== "admin") {
-          if (typeof window.showToast === "function") {
-            window.showToast("Admin area requires Admin Mode.", "warning");
+        const authSession = StorageService.getAuthSession();
+        if ((tabId === "passes" || tabId === "history") && !authSession.authenticated) {
+          if (typeof window.AuthModule?.requireAuth === "function") {
+            window.AuthModule.requireAuth("student", () => showTab(tabId));
+            return;
           }
-          return;
+        }
+        if (ADMIN_TABS.includes(tabId) && authSession.role !== "admin") {
+          if (typeof window.AuthModule?.requireAuth === "function") {
+            window.AuthModule.requireAuth("admin", () => applyRole("admin", tabId));
+            return;
+          }
         }
 
         showTab(tabId);
@@ -514,6 +566,8 @@ const bindRouter = () => {
     const hash = window.location.hash ? window.location.hash.replace(/^#/, "") : "";
     if (hash && document.getElementById(hash)) {
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      const authSession = StorageService.getAuthSession();
+      if ((hash === "passes" || hash === "history") && !authSession.authenticated) return;
       if (ADMIN_TABS.includes(hash) && role !== "admin") return;
       if (STUDENT_TABS.includes(hash) && role === "admin") return;
       showTab(hash);
@@ -644,6 +698,22 @@ const bindDataButtons = () => {
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {
         window.showToast("All data cleared.", "success");
+      }
+    });
+  }
+
+  const authBtn = document.getElementById("btn-auth-action");
+  if (authBtn) {
+    authBtn.addEventListener("click", () => {
+      const session = StorageService.getAuthSession();
+      if (session.authenticated) {
+        if (typeof window.AuthModule?.logout === "function") {
+          window.AuthModule.logout();
+        }
+      } else {
+        if (typeof window.AuthModule?.openAuthModal === "function") {
+          window.AuthModule.openAuthModal("student");
+        }
       }
     });
   }
@@ -832,6 +902,7 @@ const renderHistory = () => {
 
 const app = {
   showTab,
+  applyRole,
   renderHistory,
   updateProfileChip,
   refreshAllModules,

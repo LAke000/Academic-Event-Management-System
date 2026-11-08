@@ -12,6 +12,7 @@ const STUDENTS_KEY = "academic_students_db";
 const ROLE_KEY = "academic_active_role";
 const ACTIVE_STUDENT_KEY = "academic_active_student";
 const CLEARED_FLAG_KEY = "academic_db_cleared";
+const AUTH_SESSION_KEY = "academic_auth_session";
 
 const DEFAULT_ROLE = "student";
 const DEFAULT_ACTIVE_STUDENT_ID = "12601928";
@@ -276,6 +277,41 @@ class StorageService {
   }
 
   // ------------------------------------------------------------------
+  // Auth Session
+  // ------------------------------------------------------------------
+
+  /**
+   * Returns the current auth session from localStorage.
+   * Falls back to an unauthenticated guest session if missing or corrupt.
+   * @returns {{ authenticated: boolean, role: string, studentId: string|null }}
+   */
+  static getAuthSession() {
+    return this._read(AUTH_SESSION_KEY, { authenticated: false, role: "guest", studentId: null });
+  }
+
+  /**
+   * Persists the auth session to localStorage with defensive normalization.
+   * @param {{ authenticated?: boolean, role?: string, studentId?: string|null }} session
+   * @returns {boolean}
+   */
+  static setAuthSession(session) {
+    return this._write(AUTH_SESSION_KEY, {
+      authenticated: Boolean(session?.authenticated),
+      role: session?.role || "guest",
+      studentId: session?.studentId || null,
+    });
+  }
+
+  /**
+   * Clears the auth session to an unauthenticated guest state and
+   * resets the active role back to student.
+   */
+  static clearAuthSession() {
+    this._write(AUTH_SESSION_KEY, { authenticated: false, role: "guest", studentId: null });
+    this.setActiveRole("student");
+  }
+
+  // ------------------------------------------------------------------
   // Known Students
   // ------------------------------------------------------------------
 
@@ -351,6 +387,7 @@ class StorageService {
     localStorage.removeItem(STUDENTS_KEY);
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(ACTIVE_STUDENT_KEY);
+    localStorage.removeItem(AUTH_SESSION_KEY);
     try {
       localStorage.removeItem(CLEARED_FLAG_KEY);
     } catch (_err) {}

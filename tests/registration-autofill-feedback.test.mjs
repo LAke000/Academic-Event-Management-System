@@ -235,7 +235,7 @@ test("handleRegistrationSubmit blocks registration for cancelled events", () => 
 
   mockElements["reg-event-id"].value = "ev-cancelled";
   mockElements["reg-student-name"].value = "Dave Test";
-  mockElements["reg-student-id"].value = "12345678";
+  mockElements["reg-student-id"].value = "12645678";
   mockElements["reg-email"].value = "dave@example.edu";
   mockElements["reg-department"].value = "CS";
 
@@ -294,7 +294,7 @@ test("handleRegistrationSubmit permits re-registration if prior registration was
     {
       regId: "REG-OLD",
       eventId: "ev-reregister",
-      studentId: "12345678",
+      studentId: "12645678",
       name: "Dave Test",
       email: "dave@example.edu",
       department: "CS",
@@ -305,7 +305,7 @@ test("handleRegistrationSubmit permits re-registration if prior registration was
 
   mockElements["reg-event-id"].value = "ev-reregister";
   mockElements["reg-student-name"].value = "Dave Test";
-  mockElements["reg-student-id"].value = "12345678";
+  mockElements["reg-student-id"].value = "12645678";
   mockElements["reg-email"].value = "dave@example.edu";
   mockElements["reg-department"].value = "CS";
 
