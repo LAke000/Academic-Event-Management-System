@@ -1347,55 +1347,105 @@ input[type="radio"] {
   color: var(--color-text-muted);
 }
 
-/* 10. Authentication Dialog */
+/* ============================================================
+   10. Authentication Gateway & Auth Modal Components
+   ============================================================ */
+
 .auth-tabs {
   display: flex;
-  border-bottom: 2px solid var(--color-border);
   background-color: var(--color-surface-secondary);
-  padding: 0 var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-xs) var(--space-xl) 0;
+  gap: var(--space-sm);
 }
 
-.auth-tab {
-  flex: 1;
-  padding: var(--space-md) var(--space-lg);
+.auth-tab-btn {
+  padding: var(--space-sm) var(--space-md);
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--color-text-muted);
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
+  background: transparent;
   cursor: pointer;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
-  text-align: center;
+  transition: all var(--transition-fast);
 }
 
-.auth-tab:hover {
+.auth-tab-btn:hover {
   color: var(--color-text-primary);
 }
 
-.auth-tab.active {
+.auth-tab-btn.active {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
 }
 
-.auth-quick-actions {
-  margin-top: var(--space-md);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--color-border);
+.auth-banner {
+  margin: var(--space-md) var(--space-xl) 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.auth-banner--error {
+  background-color: var(--status-housefull-bg);
+  color: var(--status-housefull);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.auth-banner--info {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  border: 1px solid rgba(30, 58, 138, 0.2);
+}
+
+.auth-form-pane {
+  padding: var(--space-xl);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
-.auth-quick-actions .btn {
+.auth-step-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  animation: fadeIn var(--transition-base);
+}
+
+.auth-step-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--color-text-muted);
   font-size: var(--font-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: var(--space-xs) 0;
 }
 
-#auth-dialog .form-field {
-  margin-bottom: var(--space-md);
+.auth-step-divider::before,
+.auth-step-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed var(--color-border);
 }
 
-#auth-dialog .dialog-footer {
-  margin-top: var(--space-sm);
+.auth-step-divider span {
+  padding: 0 var(--space-sm);
+}
+
+.chip-avatar.chip-avatar--guest {
+  background-color: var(--color-text-muted);
+  color: var(--color-surface);
+}
+
+body.role-guest .admin-only,
+body.role-guest .student-only {
+  display: none !important;
+}
+
+body.role-guest .guest-allowed {
+  display: flex !important;
 }
