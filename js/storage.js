@@ -13,6 +13,12 @@ const ROLE_KEY = "academic_active_role";
 const ACTIVE_STUDENT_KEY = "academic_active_student";
 const CLEARED_FLAG_KEY = "academic_db_cleared";
 const AUTH_SESSION_KEY = "academic_auth_session";
+const DEFAULT_AUTH_SESSION = {
+  authenticated: false,
+  role: "guest",
+  studentId: null,
+  name: null,
+};
 
 const DEFAULT_ROLE = "student";
 const DEFAULT_ACTIVE_STUDENT_ID = "12601928";
@@ -277,38 +283,45 @@ class StorageService {
   }
 
   // ------------------------------------------------------------------
-  // Auth Session
+  // Authentication Session
   // ------------------------------------------------------------------
 
   /**
-   * Returns the current auth session from localStorage.
-   * Falls back to an unauthenticated guest session if missing or corrupt.
-   * @returns {{ authenticated: boolean, role: string, studentId: string|null }}
+   * Returns the current auth session, defaulting strictly to unauthenticated guest.
+   * @returns {{ authenticated: boolean, role: "guest"|"student"|"admin", studentId: string|null, name: string|null }}
    */
   static getAuthSession() {
-    return this._read(AUTH_SESSION_KEY, { authenticated: false, role: "guest", studentId: null });
+    return this._read(AUTH_SESSION_KEY, DEFAULT_AUTH_SESSION) || DEFAULT_AUTH_SESSION;
   }
 
   /**
-   * Persists the auth session to localStorage with defensive normalization.
-   * @param {{ authenticated?: boolean, role?: string, studentId?: string|null }} session
+   * Persists the normalized authentication session.
+   * @param {{ authenticated: boolean, role: string, studentId: string|null, name: string|null }} session
    * @returns {boolean}
    */
   static setAuthSession(session) {
-    return this._write(AUTH_SESSION_KEY, {
+    const normalized = {
       authenticated: Boolean(session?.authenticated),
       role: session?.role || "guest",
       studentId: session?.studentId || null,
-    });
+      name: session?.name || null,
+    };
+    return this._write(AUTH_SESSION_KEY, normalized);
   }
 
   /**
-   * Clears the auth session to an unauthenticated guest state and
-   * resets the active role back to student.
+   * Alias for setAuthSession for full backwards-compatibility.
+   */
+  static saveAuthSession(session) {
+    return this.setAuthSession(session);
+  }
+
+  /**
+   * Clears session and returns to default guest state.
+   * @returns {boolean}
    */
   static clearAuthSession() {
-    this._write(AUTH_SESSION_KEY, { authenticated: false, role: "guest", studentId: null });
-    this.setActiveRole("student");
+    return this._write(AUTH_SESSION_KEY, DEFAULT_AUTH_SESSION);
   }
 
   // ------------------------------------------------------------------
@@ -364,15 +377,12 @@ class StorageService {
     const regsOk = this._write(REGISTRATIONS_KEY, []);
     const feedbackOk = this._write(FEEDBACK_KEY, []);
     const remindersOk = this._write(REMINDERS_KEY, []);
-    // Ensure known students database remains intact or refreshed to DEFAULT_STUDENTS
-    const students = this._read(STUDENTS_KEY, null);
-    if (!students || students.length === 0) {
-      this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
-    }
+    this.clearAuthSession();
     try {
       localStorage.setItem(CLEARED_FLAG_KEY, "true");
     } catch (_err) {}
     this.setActiveStudentId("ALL");
+    this.setActiveRole("guest");
     return eventsOk && regsOk && feedbackOk && remindersOk;
   }
 

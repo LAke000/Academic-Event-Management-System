@@ -259,13 +259,14 @@ test("getAuthSession: returns guest fallback when no session exists", () => {
   assert.equal(session.studentId, null);
 });
 
-test("setAuthSession: persists authenticated student session", () => {
+test("setAuthSession and saveAuthSession parity: persists authenticated student session with name", () => {
   resetStore();
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId: "12601928" });
+  StorageService.saveAuthSession({ authenticated: true, role: "student", studentId: "12601928", name: "Alice Kumar" });
   const session = StorageService.getAuthSession();
   assert.equal(session.authenticated, true);
   assert.equal(session.role, "student");
   assert.equal(session.studentId, "12601928");
+  assert.equal(session.name, "Alice Kumar");
 });
 
 test("setAuthSession: defensive normalization for undefined fields", () => {

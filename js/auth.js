@@ -150,12 +150,12 @@ const handleStudentSubmit = (e) => {
 
   // Step 3: If found — log in immediately
   if (studentExists) {
-    StorageService.setAuthSession({ authenticated: true, role: "student", studentId });
+    const name = knownMatch?.name || regMatch?.name || studentId;
+    StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name });
     StorageService.setActiveRole("student");
     StorageService.setActiveStudentId(studentId);
     closeAuthModal();
     refreshApp();
-    const name = knownMatch?.name || regMatch?.name || studentId;
     if (typeof window.showToast === "function") {
       window.showToast(`Welcome back, ${name}!`, "success");
     }
@@ -199,7 +199,7 @@ const handleStudentSubmit = (e) => {
   StorageService.saveKnownStudent({ studentId, name: nameVal, email: emailVal, department: deptVal });
 
   // Authenticate
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId });
+  StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name: nameVal });
   StorageService.setActiveRole("student");
   StorageService.setActiveStudentId(studentId);
   closeAuthModal();
@@ -227,7 +227,7 @@ const handleAdminSubmit = (e) => {
     return;
   }
 
-  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null });
+  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null, name: "Event Organizer" });
   StorageService.setActiveRole("admin");
   closeAuthModal();
   if (typeof window.app?.applyRole === "function") {
@@ -266,7 +266,7 @@ const bindQuickDemoButtons = () => {
     quickStudent.addEventListener("click", () => {
       clearAuthError();
       const studentId = "12601928";
-      StorageService.setAuthSession({ authenticated: true, role: "student", studentId });
+      StorageService.setAuthSession({ authenticated: true, role: "student", studentId, name: "Alice Kumar" });
       StorageService.setActiveRole("student");
       StorageService.setActiveStudentId(studentId);
       closeAuthModal();
@@ -285,7 +285,7 @@ const bindQuickDemoButtons = () => {
   if (quickAdmin) {
     quickAdmin.addEventListener("click", () => {
       clearAuthError();
-      StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null });
+      StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null, name: "Event Organizer" });
       StorageService.setActiveRole("admin");
       closeAuthModal();
       if (typeof window.app?.applyRole === "function") {
@@ -414,6 +414,7 @@ const requireAuth = (requiredRole = "student", onSuccess = null) => {
 
 const logout = () => {
   StorageService.clearAuthSession();
+  StorageService.setActiveRole("student");
   refreshApp();
   if (typeof window.app?.applyRole === "function") {
     window.app.applyRole("student");
