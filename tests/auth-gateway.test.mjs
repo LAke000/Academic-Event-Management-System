@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 
 // ─── Mock DOM & localStorage ─────────────────────────────────────────────────
 
@@ -14,7 +16,7 @@ const mockLocalStorage = {
 
 globalThis.localStorage = mockLocalStorage;
 
-// Minimal mock document/window for module loading
+// Robust MockElement supporting event listeners, classes, and hierarchy
 class MockElement {
   constructor(tagName = "div", id = "") {
     this.tagName = tagName.toUpperCase();
@@ -23,6 +25,8 @@ class MockElement {
     this._innerHTML = "";
     this.value = "";
     this.hidden = false;
+    this.open = false;
+    this.checked = false;
     this.style = {};
     this.attributes = {};
     this.dataset = {};
@@ -30,18 +34,32 @@ class MockElement {
     this.parentElement = null;
     this.disabled = false;
     this.className = "";
+    const classes = new Set();
     this.classList = {
       _el: this,
-      add(...cls) { },
-      remove(...cls) { },
-      toggle(cls, force) { },
-      contains(cls) { return false; },
+      add(...cls) { cls.forEach((c) => classes.add(c)); },
+      remove(...cls) { cls.forEach((c) => classes.delete(c)); },
+      toggle(cls, force) {
+        if (force === undefined) {
+          classes.has(cls) ? classes.delete(cls) : classes.add(cls);
+        } else if (force) {
+          classes.add(cls);
+        } else {
+          classes.delete(cls);
+        }
+      },
+      contains(cls) { return classes.has(cls); },
     };
   }
-  set innerHTML(html) { this._innerHTML = html; if (html === "") this.children = []; }
+
+  set innerHTML(html) {
+    this._innerHTML = html;
+    if (html === "") this.children = [];
+  }
   get innerHTML() { return this._innerHTML; }
   get textContent() { return this._innerHTML || ""; }
   set textContent(text) { this._innerHTML = String(text); }
+
   appendChild(child) {
     if (child instanceof MockElement) child.parentElement = this;
     this.children.push(child);
@@ -57,46 +75,129 @@ class MockElement {
     if (idx >= 0) this.children.splice(idx, 1);
     return child;
   }
-  querySelector() { return null; }
+  querySelector(sel) {
+    if (sel.startsWith(".")) {
+      const cls = sel.slice(1);
+      return this.children.find((c) => c.classList?.contains?.(cls)) || null;
+    }
+    return null;
+  }
   querySelectorAll() { return []; }
   getAttribute(name) { return this.attributes[name] || null; }
   setAttribute(name, value) { this.attributes[name] = value; }
   removeAttribute(name) { delete this.attributes[name]; }
-  addEventListener() {}
-  removeEventListener() {}
-  insertAdjacentHTML() {}
-  showModal() {}
-  close() {}
+
+  addEventListener(event, handler) {
+    this.eventListeners[event] = this.eventListeners[event] || [];
+    this.eventListeners[event].push(handler);
+  }
+  removeEventListener(event, handler) {
+    if (!this.eventListeners[event]) return;
+    this.eventListeners[event] = this.eventListeners[event].filter((h) => h !== handler);
+  }
+  dispatchEvent(event) {
+    const type = typeof event === "string" ? event : event.type;
+    const handlers = this.eventListeners[type] || [];
+    handlers.forEach((h) => h(event));
+  }
+
+  focus() {}
+  reset() { this.value = ""; }
+  showModal() { this.open = true; }
+  close() {
+    this.open = false;
+    this.dispatchEvent({ type: "close" });
+  }
   get firstChild() { return this.children[0] || null; }
 }
 
 const _elements = {};
 const bodyEl = new MockElement("body", "body");
 
+// Ensure auth dialog elements exist in _elements
+const setupAuthDialogElements = () => {
+  const ids = [
+    "auth-dialog", "auth-tab-student", "auth-tab-admin", "auth-form-error",
+    "auth-student-form", "auth-student-id", "auth-new-student-fields",
+    "auth-student-name", "auth-student-email", "auth-student-dept",
+    "auth-student-submit", "btn-quick-student", "auth-admin-form",
+    "auth-admin-user", "auth-admin-pass", "btn-quick-admin",
+  ];
+  ids.forEach((id) => {
+    _elements[id] = new MockElement(id.startsWith("auth-tab") || id.startsWith("btn-") ? "button" : "div", id);
+  });
+
+  const dialog = _elements["auth-dialog"];
+  const closeBtn = new MockElement("button", "auth-dialog-close");
+  closeBtn.classList.add("dialog-close");
+  dialog.children = [closeBtn];
+
+  _elements["auth-new-student-fields"].hidden = true;
+  _elements["auth-admin-form"].hidden = true;
+  _elements["auth-form-error"].hidden = true;
+  _elements["auth-form-error"].textContent = "";
+  _elements["auth-student-submit"].textContent = "Continue";
+};
+
+// Initial populate of registration and app elements
+[
+  "registration-dialog", "registration-form", "reg-student-preset",
+  "reg-event-id", "reg-student-name", "reg-student-id", "reg-email",
+  "reg-department", "reg-form-error", "reg-cancel-btn", "reg-clear-btn",
+  "reg-fill-active-btn", "passes-list", "passes-empty", "pass-dialog",
+  "qrcode-target", "btn-print-pass", "btn-close-pass", "pass-badge",
+  "pass-title", "pass-department", "pass-venue", "pass-datetime",
+  "pass-studentid", "pass-email", "pass-regid", "reminders-banner",
+  "chip-name", "chip-status", "chip-avatar", "btn-auth-action",
+  "student-switcher", "role-toggle", "btn-seed-data", "toast-container",
+].forEach((id) => {
+  if (!_elements[id]) _elements[id] = new MockElement("div", id);
+});
+
+bodyEl.insertAdjacentHTML = (_pos, _html) => {
+  setupAuthDialogElements();
+};
+
 globalThis.document = {
   readyState: "complete",
   body: bodyEl,
   createElement(tagName) { return new MockElement(tagName); },
-  getElementById(id) { return _elements[id] || null; },
-  querySelector() { return null; },
+  getElementById(id) {
+    return _elements[id] || null;
+  },
+  querySelector(sel) {
+    if (sel.startsWith("#")) return globalThis.document.getElementById(sel.slice(1));
+    return null;
+  },
   querySelectorAll() { return []; },
   addEventListener() {},
 };
 
 globalThis.window = globalThis;
 globalThis.window.showToast = () => {};
-globalThis.window.app = { applyRole: () => {}, refreshAllModules: () => {}, updateProfileChip: () => {} };
+globalThis.window.app = {
+  applyRole: () => {},
+  refreshAllModules: () => {},
+  updateProfileChip: () => {},
+};
 
-// ─── Import StorageService & AuthModule ───────────────────────────────────
+// ─── Import Modules ──────────────────────────────────────────────────────────
 
 const { default: StorageService } = await import("../js/storage.js");
 const { default: AuthModule } = await import("../js/auth.js");
+const { default: RegistrationModule } = await import("../js/registration.js");
 
-// ─── Test Scaffolding: Clean localStorage before each test ──────────────────
+// ─── Scaffolding: Reset localStorage & Auth dialog ──────────────────────────
 
 const resetStore = () => {
   mockLocalStorage.clear();
   StorageService.seedDemoData(true);
+};
+
+const rebindAuthDialog = () => {
+  // Clear existing dialog elements and re-init AuthModule
+  delete _elements["auth-dialog"];
+  AuthModule.init();
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -112,12 +213,37 @@ test("ROLL_REGEX: valid 126xxxxx roll numbers pass", () => {
 
 test("ROLL_REGEX: invalid roll numbers are rejected", () => {
   const ROLL_REGEX = /^126\d{5}$/;
-  assert.ok(!ROLL_REGEX.test("12501928"), "125xxxxx should fail");
-  assert.ok(!ROLL_REGEX.test("1260192"), "7 digits should fail");
-  assert.ok(!ROLL_REGEX.test("126019289"), "9 digits should fail");
+  assert.ok(!ROLL_REGEX.test("12501928"), "125xxxxx should fail (wrong prefix)");
+  assert.ok(!ROLL_REGEX.test("1260192"), "7 digits should fail (too short)");
+  assert.ok(!ROLL_REGEX.test("126019289"), "9 digits should fail (too long)");
   assert.ok(!ROLL_REGEX.test(""), "empty should fail");
   assert.ok(!ROLL_REGEX.test("ABCDEFGH"), "alpha should fail");
   assert.ok(!ROLL_REGEX.test("126abcde"), "mixed alpha should fail");
+  assert.ok(!ROLL_REGEX.test("126ABCDE"), "uppercase alpha should fail");
+});
+
+test("Registration validation: validateRegistration rejects non-126xxxxx IDs and accepts valid ones", () => {
+  const expectedMsg = "Student ID / Roll No. must start with 126 and be 8 digits (e.g. 12601928).";
+
+  // Invalid prefix
+  const errPrefix = RegistrationModule.validateRegistration("Test", "12501928", "test@univ.edu", "CSE");
+  assert.equal(errPrefix, expectedMsg, "Should reject 125 prefix");
+
+  // Short ID
+  const errShort = RegistrationModule.validateRegistration("Test", "1260192", "test@univ.edu", "CSE");
+  assert.equal(errShort, expectedMsg, "Should reject 7 digits");
+
+  // Non-numeric
+  const errAlpha = RegistrationModule.validateRegistration("Test", "126ABCDE", "test@univ.edu", "CSE");
+  assert.equal(errAlpha, expectedMsg, "Should reject alphanumeric");
+
+  // Long ID
+  const errLong = RegistrationModule.validateRegistration("Test", "126019280", "test@univ.edu", "CSE");
+  assert.equal(errLong, expectedMsg, "Should reject 9 digits");
+
+  // Valid 126xxxxx
+  const valid = RegistrationModule.validateRegistration("Test", "12601928", "test@univ.edu", "CSE");
+  assert.equal(valid, null, "Valid 126xxxxx roll number must return null");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -180,172 +306,323 @@ test("resetDatabase: removes auth session key", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. Student Auto-Detection Signup Flow
+// 3. Guest Mode Default & Route Gating
 // ═══════════════════════════════════════════════════════════════════════════
 
-test("Known student 12601928 is found in knownStudents", () => {
+test("Guest Mode: unauthenticated session defaults to Guest role and blocks protected tabs", () => {
   resetStore();
-  const knownStudents = StorageService.getKnownStudents();
-  const alice = knownStudents.find((s) => s.studentId === "12601928");
-  assert.ok(alice, "Alice Kumar should exist in known students");
-  assert.equal(alice.name, "Alice Kumar");
+  StorageService.clearAuthSession();
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, false, "Initial boot must be unauthenticated");
+  assert.equal(session.role, "guest", "Initial boot must have guest role");
+  assert.equal(session.studentId, null, "Initial boot must have null studentId");
+  assert.equal(AuthModule.isAuthenticated(), false);
+  assert.equal(AuthModule.getCurrentRole(), "guest");
 });
 
-test("New roll number 12609999 is NOT found in knownStudents or registrations", () => {
+test("Guest Mode: requireAuth intercepts unauthenticated requests and opens auth modal", () => {
   resetStore();
-  const knownStudents = StorageService.getKnownStudents();
-  const regs = StorageService.getRegistrations();
-  const knownMatch = knownStudents.find((s) => s.studentId === "12609999");
-  const regMatch = regs.find((r) => r.studentId === "12609999");
-  assert.ok(!knownMatch, "12609999 should not be in known students");
-  assert.ok(!regMatch, "12609999 should not be in registrations");
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let actionCalled = false;
+  AuthModule.requireAuth("student", () => { actionCalled = true; });
+
+  assert.equal(actionCalled, false, "Protected callback must not run before authentication");
+  assert.equal(_elements["auth-dialog"].open, true, "Auth modal must be opened for unauthenticated request");
 });
 
-test("saveKnownStudent adds a new student to the roster", () => {
+test("Guest Mode: router and role toggle static contract guards in js/app.js", () => {
+  const appSrc = fs.readFileSync(path.resolve("js/app.js"), "utf-8");
+
+  // passes and history tab protection
+  assert.ok(
+    appSrc.includes('(tabId === "passes" || tabId === "history") && !authSession.authenticated'),
+    "js/app.js must gate #passes and #history against unauthenticated users in showTab"
+  );
+
+  // admin tabs protection
+  assert.ok(
+    appSrc.includes('ADMIN_TABS.includes(tabId) && authSession.role !== "admin"'),
+    "js/app.js must gate ADMIN_TABS against non-admin in showTab"
+  );
+
+  // role toggle protection
+  assert.ok(
+    appSrc.includes('session.role !== "admin"') && appSrc.includes("toggle.checked = false"),
+    "js/app.js must revert role-toggle when non-admin attempts to switch"
+  );
+
+  // profile chip guest mode display
+  assert.ok(
+    appSrc.includes('"Guest Mode"') && appSrc.includes('"Sign in to register"'),
+    "js/app.js updateProfileChip must display Guest Mode when unauthenticated"
+  );
+
+  // top-bar auth button action
+  assert.ok(
+    appSrc.includes('btn-auth-action'),
+    "js/app.js must wire #btn-auth-action"
+  );
+});
+
+test("Guest Mode: events.js gates event registration for unauthenticated users", () => {
+  const eventsSrc = fs.readFileSync(path.resolve("js/events.js"), "utf-8");
+  assert.ok(
+    eventsSrc.includes("StorageService.getAuthSession().authenticated"),
+    "js/events.js openRegistrationModal must verify authenticated authSession"
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. Student Auto-Detection End-to-End Flow
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Student Auto-Detection: existing student (12601928) logs in immediately on step 1 with pendingCallback", () => {
   resetStore();
-  StorageService.saveKnownStudent({
-    studentId: "12609999",
-    name: "Test User",
-    email: "test@example.edu",
-    department: "CSE",
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let callbackExecuted = false;
+  AuthModule.openAuthModal("student", () => {
+    callbackExecuted = true;
   });
-  const knownStudents = StorageService.getKnownStudents();
-  const found = knownStudents.find((s) => s.studentId === "12609999");
-  assert.ok(found, "New student should be saved");
-  assert.equal(found.name, "Test User");
-  assert.equal(found.email, "test@example.edu");
+
+  _elements["auth-student-id"].value = "12601928";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true, "Existing student must be authenticated");
+  assert.equal(session.role, "student", "Role must be student");
+  assert.equal(session.studentId, "12601928", "Student ID must match Alice Kumar");
+  assert.equal(callbackExecuted, true, "pendingCallback must be executed on step 1 login");
+  assert.equal(_elements["auth-new-student-fields"].hidden, true, "New student fields must remain hidden");
+  assert.equal(_elements["auth-dialog"].open, false, "Dialog must be closed");
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// 4. Admin Passcode Login
-// ═══════════════════════════════════════════════════════════════════════════
-
-test("Admin credentials: correct username/passcode accepted", () => {
-  const ADMIN_USER = "admin";
-  const ADMIN_PASS = "AEMS-Admin-2026";
-  const username = "admin";
-  const passcode = "AEMS-Admin-2026";
-  assert.equal(username.trim().toLowerCase(), ADMIN_USER, "username matches");
-  assert.equal(passcode, ADMIN_PASS, "passcode matches");
-});
-
-test("Admin credentials: wrong passcode rejected", () => {
-  const ADMIN_USER = "admin";
-  const ADMIN_PASS = "AEMS-Admin-2026";
-  const username = "admin";
-  const passcode = "wrong-password";
-  assert.notEqual(passcode, ADMIN_PASS, "wrong passcode must be rejected");
-});
-
-test("Admin credentials: wrong username rejected", () => {
-  const ADMIN_USER = "admin";
-  const username = "student";
-  assert.notEqual(username.trim().toLowerCase(), ADMIN_USER, "wrong username must be rejected");
-});
-
-test("Admin session can be set and read back", () => {
+test("Student Auto-Detection: unrecognized valid ID (12699999) step 1 reveals profile fields without authenticating", () => {
   resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let callbackExecuted = false;
+  AuthModule.openAuthModal("student", () => {
+    callbackExecuted = true;
+  });
+
+  _elements["auth-student-id"].value = "12699999";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  assert.equal(StorageService.getAuthSession().authenticated, false, "Step 1 must not authenticate new student");
+  assert.equal(callbackExecuted, false, "pendingCallback must not run until signup is complete");
+  assert.equal(_elements["auth-new-student-fields"].hidden, false, "#auth-new-student-fields must be revealed");
+  assert.equal(_elements["auth-student-submit"].textContent, "Complete Sign Up & Login", "Submit button text must update");
+  assert.equal(_elements["auth-form-error"].hidden, false, "Info prompt must be shown");
+  assert.ok(_elements["auth-form-error"].textContent.includes("New Roll Number detected"));
+});
+
+test("Student Auto-Detection: unrecognized valid ID (12699999) step 2 saves profile and authenticates", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let callbackExecuted = false;
+  AuthModule.openAuthModal("student", () => {
+    callbackExecuted = true;
+  });
+
+  // Step 1: Reveal profile fields
+  _elements["auth-student-id"].value = "12699999";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+  assert.equal(_elements["auth-new-student-fields"].hidden, false);
+
+  // Step 2: Fill fields and submit
+  _elements["auth-student-name"].value = "Carol Danvers";
+  _elements["auth-student-email"].value = "carol.danvers@example.edu";
+  _elements["auth-student-dept"].value = "Aero";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true, "New student must be authenticated after step 2");
+  assert.equal(session.role, "student");
+  assert.equal(session.studentId, "12699999");
+  assert.equal(callbackExecuted, true, "pendingCallback must run upon completing registration");
+
+  // Verify saved in knownStudents
+  const known = StorageService.getKnownStudents().find((s) => s.studentId === "12699999");
+  assert.ok(known, "Carol Danvers should be stored in knownStudents");
+  assert.equal(known.name, "Carol Danvers");
+  assert.equal(known.email, "carol.danvers@example.edu");
+  assert.equal(known.department, "Aero");
+});
+
+test("Student Auto-Detection: duplicate email rejection during step 2", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  _elements["auth-student-id"].value = "12688888";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+  assert.equal(_elements["auth-new-student-fields"].hidden, false);
+
+  // Provide Alice's email
+  _elements["auth-student-name"].value = "Imposter Student";
+  _elements["auth-student-email"].value = "alice.kumar@example.edu";
+  _elements["auth-student-dept"].value = "CSE";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  assert.equal(StorageService.getAuthSession().authenticated, false, "Must not authenticate with duplicate email");
+  assert.equal(_elements["auth-form-error"].textContent, "This email address is already associated with another student.");
+});
+
+test("Student Auto-Detection: editing roll number resets new-student fields to hidden", () => {
+  resetStore();
+  rebindAuthDialog();
+  AuthModule.openAuthModal("student");
+
+  // Step 1: trigger new-student fields
+  _elements["auth-student-id"].value = "12677777";
+  _elements["auth-student-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+  assert.equal(_elements["auth-new-student-fields"].hidden, false);
+  assert.equal(_elements["auth-student-submit"].textContent, "Complete Sign Up & Login");
+
+  // User edits roll input
+  _elements["auth-student-id"].value = "1267777";
+  _elements["auth-student-id"].dispatchEvent({ type: "input" });
+
+  assert.equal(_elements["auth-new-student-fields"].hidden, true, "New student fields must hide on roll edit");
+  assert.equal(_elements["auth-student-submit"].textContent, "Continue", "Submit text must reset to Continue");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. Admin Gate & Credential Verification
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Admin Gate: rejects wrong passcodes with descriptive error", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+  AuthModule.openAuthModal("admin");
+
+  _elements["auth-admin-user"].value = "admin";
+  _elements["auth-admin-pass"].value = "WrongPassword2026";
+  _elements["auth-admin-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  assert.equal(StorageService.getAuthSession().authenticated, false, "Invalid passcode must not authenticate");
+  assert.equal(_elements["auth-form-error"].textContent, "Invalid organizer credentials. Use admin / AEMS-Admin-2026.");
+});
+
+test("Admin Gate: rejects wrong username with descriptive error", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+  AuthModule.openAuthModal("admin");
+
+  _elements["auth-admin-user"].value = "organizer";
+  _elements["auth-admin-pass"].value = "AEMS-Admin-2026";
+  _elements["auth-admin-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  assert.equal(StorageService.getAuthSession().authenticated, false, "Invalid username must not authenticate");
+  assert.equal(_elements["auth-form-error"].textContent, "Invalid organizer credentials. Use admin / AEMS-Admin-2026.");
+});
+
+test("Admin Gate: authenticates admin / AEMS-Admin-2026 and unlocks organizer features", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let adminActionExecuted = false;
+  let appliedRole = null;
+  globalThis.window.app.applyRole = (role) => { appliedRole = role; };
+
+  AuthModule.openAuthModal("admin", () => {
+    adminActionExecuted = true;
+  });
+
+  _elements["auth-admin-user"].value = "admin";
+  _elements["auth-admin-pass"].value = "AEMS-Admin-2026";
+  _elements["auth-admin-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true, "Admin credentials must authenticate");
+  assert.equal(session.role, "admin", "Session role must be admin");
+  assert.equal(session.studentId, null, "Admin session has null studentId");
+  assert.equal(StorageService.getActiveRole(), "admin", "StorageService active role must be admin");
+  assert.equal(appliedRole, "admin", "window.app.applyRole must be called with 'admin'");
+  assert.equal(adminActionExecuted, true, "pendingCallback must run upon admin login");
+  assert.equal(_elements["auth-dialog"].open, false, "Auth dialog must be closed");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. Logout Reset & Session Cleanup
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Logout Reset: AuthModule.logout clears session and resets to guest state", () => {
+  resetStore();
+  let appliedRole = null;
+  globalThis.window.app.applyRole = (role) => { appliedRole = role; };
+
+  // Set active admin session
   StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null });
+  StorageService.setActiveRole("admin");
+  assert.equal(AuthModule.isAuthenticated(), true);
+
+  // Perform logout
+  AuthModule.logout();
+
+  // Verify session is cleared
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, false, "Session authenticated must be false");
+  assert.equal(session.role, "guest", "Session role must be guest");
+  assert.equal(session.studentId, null, "Session studentId must be null");
+  assert.equal(AuthModule.isAuthenticated(), false);
+  assert.equal(AuthModule.getCurrentRole(), "guest");
+
+  // Verify role reset to student view
+  assert.equal(StorageService.getActiveRole(), "student", "Active role must be reset to student");
+  assert.equal(appliedRole, "student", "app.applyRole must be invoked to navigate back to default view");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. Quick Demo Buttons
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Quick Demo Student: Alice Kumar button logs in directly", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let callbackExecuted = false;
+  AuthModule.openAuthModal("student", () => { callbackExecuted = true; });
+
+  _elements["btn-quick-student"].dispatchEvent({ type: "click" });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true);
+  assert.equal(session.role, "student");
+  assert.equal(session.studentId, "12601928");
+  assert.equal(callbackExecuted, true);
+  assert.equal(_elements["auth-dialog"].open, false);
+});
+
+test("Quick Demo Admin: Event Organizer button logs in directly", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let callbackExecuted = false;
+  let appliedRole = null;
+  globalThis.window.app.applyRole = (role) => { appliedRole = role; };
+
+  AuthModule.openAuthModal("admin", () => { callbackExecuted = true; });
+
+  _elements["btn-quick-admin"].dispatchEvent({ type: "click" });
+
   const session = StorageService.getAuthSession();
   assert.equal(session.authenticated, true);
   assert.equal(session.role, "admin");
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 5. Registration Validation with 126xxxxx Enforcement
-// ═══════════════════════════════════════════════════════════════════════════
-
-test("Registration validation: valid 126xxxxx roll number accepted", () => {
-  const studentId = "12601928";
-  assert.ok(/^126\d{5}$/.test(studentId.trim()), "valid roll number should pass");
-});
-
-test("Registration validation: non-126 roll number rejected", () => {
-  const studentId = "99901928";
-  assert.ok(!/^126\d{5}$/.test(studentId.trim()), "non-126 roll number should fail");
-});
-
-test("Registration validation: short roll number rejected", () => {
-  const studentId = "1260192";
-  assert.ok(!/^126\d{5}$/.test(studentId.trim()), "7-digit roll number should fail");
-});
-
-test("Registration validation: long roll number rejected", () => {
-  const studentId = "126019280";
-  assert.ok(!/^126\d{5}$/.test(studentId.trim()), "9-digit roll number should fail");
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 6. Duplicate Email Check
-// ═══════════════════════════════════════════════════════════════════════════
-
-test("Duplicate email detection across known students", () => {
-  resetStore();
-  const knownStudents = StorageService.getKnownStudents();
-  const testEmail = "alice.kumar@example.edu";
-  const hasDup = knownStudents.some(
-    (s) => (s.email || "").toLowerCase() === testEmail.toLowerCase()
-  );
-  assert.ok(hasDup, "alice.kumar@example.edu should be detected as duplicate");
-});
-
-test("Unique email passes duplicate check", () => {
-  resetStore();
-  const knownStudents = StorageService.getKnownStudents();
-  const regs = StorageService.getRegistrations();
-  const testEmail = "unique.user@example.edu";
-  const hasDup = knownStudents.some(
-    (s) => (s.email || "").toLowerCase() === testEmail.toLowerCase()
-  ) || regs.some(
-    (r) => (r.email || "").toLowerCase() === testEmail.toLowerCase()
-  );
-  assert.ok(!hasDup, "unique.user@example.edu should not be a duplicate");
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 7. AuthModule exports verification & behavior
-// ═══════════════════════════════════════════════════════════════════════════
-
-test("AuthModule exports all required methods", () => {
-  const expectedMethods = [
-    "init", "openAuthModal", "closeAuthModal",
-    "requireAuth", "logout", "isAuthenticated", "getCurrentRole",
-  ];
-  expectedMethods.forEach((method) => {
-    assert.equal(typeof AuthModule[method], "function", `${method} should be a function on AuthModule`);
-  });
-});
-
-test("AuthModule.isAuthenticated and getCurrentRole reflect auth session state", () => {
-  resetStore();
-  StorageService.clearAuthSession();
-  assert.equal(AuthModule.isAuthenticated(), false);
-  assert.equal(AuthModule.getCurrentRole(), "guest");
-
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId: "12601928" });
-  assert.equal(AuthModule.isAuthenticated(), true);
-  assert.equal(AuthModule.getCurrentRole(), "student");
-
-  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null });
-  assert.equal(AuthModule.isAuthenticated(), true);
-  assert.equal(AuthModule.getCurrentRole(), "admin");
-});
-
-test("AuthModule.logout clears session and resets role", () => {
-  resetStore();
-  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null });
-  AuthModule.logout();
-  assert.equal(AuthModule.isAuthenticated(), false);
-  assert.equal(AuthModule.getCurrentRole(), "guest");
-  assert.equal(StorageService.getActiveRole(), "student");
-});
-
-test("AuthModule.requireAuth invokes callback immediately if already authenticated with matching role", () => {
-  resetStore();
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId: "12601928" });
-  let called = false;
-  AuthModule.requireAuth("student", () => {
-    called = true;
-  });
-  assert.equal(called, true, "requireAuth should invoke callback when already authenticated");
+  assert.equal(appliedRole, "admin");
+  assert.equal(callbackExecuted, true);
+  assert.equal(_elements["auth-dialog"].open, false);
 });

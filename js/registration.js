@@ -1072,6 +1072,7 @@ const RegistrationModule = {
   closeRegistrationModal,
   populateRegPresetSelect,
   handleRegistrationSubmit,
+  validateRegistration,
   renderPasses,
   showPassQR,
   cancelRegistration,
