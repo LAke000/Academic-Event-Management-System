@@ -1462,3 +1462,10 @@ body.role-guest .admin-only {
 body.role-guest .guest-allowed {
   display: flex !important;
 }
+
+.auth-quick-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: var(--space-xs);
+}

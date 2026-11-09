@@ -761,7 +761,8 @@ const bindDataButtons = () => {
   if (clearData) {
     clearData.addEventListener("click", () => {
       StorageService.clearAllData();
-      const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+      const session = StorageService.getAuthSession();
+      const role = session.authenticated && session.role === "admin" ? "admin" : "student";
       refreshAllModules(role);
       showTab(role === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT);
       if (typeof window.showToast === "function") {

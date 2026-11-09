@@ -341,20 +341,28 @@ test("resetDatabase: removes auth session key", () => {
   assert.equal(session.authenticated, false);
 });
 
-test("clearAllData: purges session and resets to guest state", () => {
+test("clearAllData: preserves active admin session and clears unauthenticated session", () => {
   resetStore();
-  StorageService.setAuthSession({ authenticated: true, role: "student", studentId: "12601928", name: "Alice" });
-  StorageService.setActiveRole("student");
+  // 1. Unauthenticated case
+  StorageService.clearAuthSession();
   StorageService.setActiveStudentId("12601928");
-
   StorageService.clearAllData();
 
-  const session = StorageService.getAuthSession();
+  let session = StorageService.getAuthSession();
   assert.equal(session.authenticated, false, "Session must not be authenticated");
   assert.equal(session.role, "guest", "Session role must be guest");
   assert.equal(session.studentId, null, "studentId must be null");
   assert.equal(StorageService.getActiveRole(), "student", "Active role must be student");
   assert.equal(StorageService.getActiveStudentId(), "ALL", "Active student id must be ALL");
+
+  // 2. Authenticated Admin case
+  StorageService.setAuthSession({ authenticated: true, role: "admin", studentId: null, name: "Admin" });
+  StorageService.setActiveRole("admin");
+  StorageService.clearAllData();
+
+  session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true, "Admin session must be preserved on clearAllData");
+  assert.equal(session.role, "admin", "Admin role must be preserved on clearAllData");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

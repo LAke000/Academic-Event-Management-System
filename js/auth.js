@@ -209,16 +209,14 @@ const loginStudent = (student) => {
     window.showToast(`Welcome, ${student.name}!`, "success");
   }
 
-  // If a pending callback exists, let the callback drive navigation
+  // Ensure body role classes, toggle switch, and profile chip sync cleanly
+  if (window.app && typeof window.app.applyRole === "function") {
+    window.app.applyRole("student", "discover");
+  }
+
+  // Execute callback if it was targeted for student or any role
   if (typeof cb === "function" && (!reqRole || reqRole === "student" || reqRole === "any")) {
-    if (window.app && typeof window.app.refreshAllModules === "function") {
-      window.app.refreshAllModules("student");
-    }
     cb();
-  } else {
-    if (window.app && typeof window.app.applyRole === "function") {
-      window.app.applyRole("student", "discover");
-    }
   }
 };
 
@@ -310,15 +308,14 @@ const completeAdminLogin = () => {
     window.showToast("Signed in as Event Organizer.", "success");
   }
 
+  // Ensure full Admin dashboard shell mounts with body.role-admin
+  if (window.app && typeof window.app.applyRole === "function") {
+    window.app.applyRole("admin", "dashboard");
+  }
+
+  // Execute callback if targeted for admin
   if (typeof cb === "function" && (!reqRole || reqRole === "admin" || reqRole === "any")) {
-    if (window.app && typeof window.app.refreshAllModules === "function") {
-      window.app.refreshAllModules("admin");
-    }
     cb();
-  } else {
-    if (window.app && typeof window.app.applyRole === "function") {
-      window.app.applyRole("admin", "dashboard");
-    }
   }
 };
 
@@ -427,16 +424,23 @@ const bindEvents = () => {
   document.getElementById("btn-cancel-auth-student")?.addEventListener("click", closeAuthModal);
   document.getElementById("btn-cancel-auth-admin")?.addEventListener("click", closeAuthModal);
 
-  // Quick Demo Buttons
+  // Quick Demo Buttons (with defensive fallbacks)
   document.getElementById("btn-quick-student")?.addEventListener("click", () => {
     if (studentIdInput) studentIdInput.value = "12601928";
-    const alice = findKnownStudent("12601928");
-    if (alice) loginStudent(alice);
+    const alice = findKnownStudent("12601928") || {
+      studentId: "12601928",
+      name: "Alice Kumar",
+      email: "alice.kumar@example.edu",
+      department: "CSE",
+    };
+    loginStudent(alice);
   });
 
   document.getElementById("btn-quick-admin")?.addEventListener("click", () => {
-    if (adminUsernameInput) adminUsernameInput.value = ADMIN_USER;
-    if (adminPasscodeInput) adminPasscodeInput.value = ADMIN_PASS;
+    const userInput = document.getElementById("auth-admin-user") || adminUsernameInput;
+    const passInput = document.getElementById("auth-admin-pass") || adminPasscodeInput;
+    if (userInput) userInput.value = ADMIN_USER;
+    if (passInput) passInput.value = ADMIN_PASS;
     completeAdminLogin();
   });
 
