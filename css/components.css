@@ -516,7 +516,7 @@ dialog::backdrop {
 }
 
 .dialog-body,
-.dialog > .dialog-panel > :not(header):not(footer):not(.auth-tabs):not(.auth-banner) {
+.dialog > .dialog-panel > :not(header):not(footer) {
   padding: var(--space-lg) var(--space-xl);
   overflow-y: auto;
   flex: 1 1 auto;
@@ -524,19 +524,6 @@ dialog::backdrop {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-}
-
-.dialog > .dialog-panel > .auth-tabs {
-  flex-direction: row;
-  flex: 0 0 auto;
-  overflow: visible;
-  padding: var(--space-xs) var(--space-xl) 0;
-}
-
-.dialog > .dialog-panel > .auth-banner {
-  flex: 0 0 auto;
-  overflow: visible;
-  padding: var(--space-sm) var(--space-md);
 }
 
 .dialog > .dialog-panel > .pass-layout {
@@ -1364,12 +1351,16 @@ input[type="radio"] {
    10. Authentication Gateway & Auth Modal Components
    ============================================================ */
 
+.dialog > .dialog-panel > .auth-tabs,
 .auth-tabs {
   display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
   background-color: var(--color-surface-secondary);
   border-bottom: 1px solid var(--color-border);
   padding: var(--space-xs) var(--space-xl) 0;
   gap: var(--space-sm);
+  overflow: visible;
 }
 
 .auth-tab-btn {
@@ -1392,13 +1383,16 @@ input[type="radio"] {
   border-bottom-color: var(--color-primary);
 }
 
+.dialog > .dialog-panel > .auth-banner,
 .auth-banner {
+  flex: 0 0 auto;
   margin: var(--space-md) var(--space-xl) 0;
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
   font-size: var(--font-sm);
   font-weight: 500;
   line-height: var(--line-height-tight);
+  overflow: visible;
 }
 
 .auth-banner--error {
@@ -1413,11 +1407,18 @@ input[type="radio"] {
   border: 1px solid rgba(30, 58, 138, 0.2);
 }
 
+.dialog > .dialog-panel > .auth-form-pane,
 .auth-form-pane {
-  padding: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl) 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.auth-form-pane > .dialog-footer {
+  margin: var(--space-sm) calc(-1 * var(--space-xl)) 0;
 }
 
 .auth-step-fields {
