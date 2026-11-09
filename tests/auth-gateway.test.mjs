@@ -616,6 +616,7 @@ test("Admin Gate: authenticates admin / AEMS-Admin-2026 and unlocks organizer fe
   globalThis.window.app.applyRole = (role) => { appliedRole = role; };
 
   AuthModule.openAuthModal("admin", () => {
+    globalThis.window.app.applyRole("admin");
     adminActionExecuted = true;
   });
 

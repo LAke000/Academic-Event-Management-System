@@ -303,18 +303,19 @@ const renderDiscover = () => {
   const authSession =
     typeof StorageService.getAuthSession === "function"
       ? StorageService.getAuthSession()
-      : { authenticated: true, role: "student" };
+      : { authenticated: false, role: "guest" };
+  const isStudentAuth = Boolean(authSession && authSession.authenticated && authSession.role === "student");
   const isGuest = !authSession.authenticated && StorageService.getActiveRole() !== "admin";
-  const activeStudentId = isGuest ? null : StorageService.getActiveStudentId();
+  const activeStudentId = isStudentAuth ? StorageService.getActiveStudentId() : null;
 
-  const regs = isGuest
+  const regs = !isStudentAuth
     ? []
     : activeStudentId && activeStudentId !== "ALL"
     ? StorageService.getRegistrations().filter((r) => r.studentId === activeStudentId)
     : StorageService.getRegistrations();
   const registeredEventIds = new Set(regs.map((r) => r.eventId));
 
-  const upcomingReminders = isGuest
+  const upcomingReminders = !isStudentAuth
     ? []
     : reminders.filter(
         (rem) =>
@@ -369,7 +370,7 @@ const renderDiscover = () => {
 
     // Check if the active authenticated student is already registered for this event.
     const activeReg =
-      !isGuest && activeStudentId && activeStudentId !== "ALL"
+      activeStudentId && activeStudentId !== "ALL"
         ? allEventRegs.find((r) => r.studentId === activeStudentId)
         : null;
     const alreadyRegistered = Boolean(activeReg);
@@ -1151,18 +1152,15 @@ const openRegistrationModal = async (eventId) => {
     return;
   }
 
-  const session =
-    typeof StorageService.getAuthSession === "function"
-      ? StorageService.getAuthSession()
-      : { authenticated: true };
-  if (
-    !session.authenticated &&
-    StorageService.getActiveRole() !== "admin" &&
-    typeof window !== "undefined" &&
-    typeof window.AuthModule?.requireAuth === "function"
-  ) {
-    window.AuthModule.requireAuth("student", () => openRegistrationModal(eventId));
-    return;
+  // Intercept unauthenticated guests attempting to register
+  const session = StorageService.getAuthSession();
+  if (!session.authenticated && StorageService.getActiveRole() !== "admin") {
+    if (typeof window.AuthModule?.requireAuth === "function") {
+      window.AuthModule.requireAuth("student", () => {
+        openRegistrationModal(eventId);
+      });
+      return;
+    }
   }
 
   try {

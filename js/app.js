@@ -488,6 +488,8 @@ const bindRoleToggle = () => {
 
   toggle.addEventListener("change", () => {
     const session = StorageService.getAuthSession();
+
+    // Attempting to enter Admin Mode
     if (toggle.checked) {
       if (session.authenticated && session.role === "admin") {
         applyRole("admin");
@@ -495,26 +497,21 @@ const bindRoleToggle = () => {
         toggle.checked = false;
         toggle.setAttribute("aria-checked", "false");
         if (typeof window.AuthModule?.requireAuth === "function") {
-          window.AuthModule.requireAuth("admin", () => applyRole("admin"));
+          window.AuthModule.requireAuth("admin", () => {
+            toggle.checked = true;
+            toggle.setAttribute("aria-checked", "true");
+            applyRole("admin", "dashboard");
+          });
         }
       }
       return;
     }
 
-    const fallbackStudentId = StorageService.getActiveStudentId();
-    if (!fallbackStudentId || fallbackStudentId === "ALL") {
-      StorageService.setActiveStudentId("12601928");
+    // Flipping back from Admin Mode to Student/Guest view
+    if (session.authenticated && session.role === "admin") {
+      StorageService.clearAuthSession();
     }
-    const targetId = StorageService.getActiveStudentId() || "12601928";
-    const known = StorageService.getKnownStudents().find((s) => s.studentId === targetId);
-    StorageService.setAuthSession({
-      authenticated: true,
-      role: "student",
-      studentId: targetId,
-      name: known ? known.name : "Alice Kumar",
-    });
-    applyRole("student");
-    refreshAllModules("student");
+    applyRole("student", "discover");
   });
 };
 
@@ -639,10 +636,8 @@ const bindRouter = () => {
     const hash = window.location.hash ? window.location.hash.replace(/^#/, "") : "";
     if (hash && document.getElementById(hash)) {
       const role = StorageService.getActiveRole() || DEFAULT_ROLE;
-      const authSession = StorageService.getAuthSession();
-      if ((hash === "passes" || hash === "history") && !authSession.authenticated) return;
-      if (ADMIN_TABS.includes(hash) && role !== "admin") return;
       if (STUDENT_TABS.includes(hash) && role === "admin") return;
+      // Route directly through showTab() so requireAuth() interceptors execute cleanly
       showTab(hash);
     }
   });
