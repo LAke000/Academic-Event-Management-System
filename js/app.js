@@ -237,6 +237,15 @@ const buildStudentSwitcher = () => {
     const selected = e.target.value;
     try {
       StorageService.setActiveStudentId(selected);
+      const session = StorageService.getAuthSession();
+      if (session.authenticated && session.role === "student") {
+        const known = StorageService.getKnownStudents().find((s) => s.studentId === selected);
+        StorageService.setAuthSession({
+          ...session,
+          studentId: selected,
+          name: selected === "ALL" ? "All Demo Students" : (known?.name || session.name),
+        });
+      }
     } catch (_err) {}
     try {
       updateProfileChip(StorageService.getActiveRole() || DEFAULT_ROLE);
@@ -464,18 +473,33 @@ const bindRoleToggle = () => {
 
   toggle.addEventListener("change", () => {
     const session = StorageService.getAuthSession();
-    if (toggle.checked && session.role !== "admin") {
-      toggle.checked = false;
-      toggle.setAttribute("aria-checked", "false");
-      if (typeof window.AuthModule?.requireAuth === "function") {
-        window.AuthModule.requireAuth("admin", () => applyRole("admin"));
+    if (toggle.checked) {
+      if (session.authenticated && session.role === "admin") {
+        applyRole("admin");
+      } else {
+        toggle.checked = false;
+        toggle.setAttribute("aria-checked", "false");
+        if (typeof window.AuthModule?.requireAuth === "function") {
+          window.AuthModule.requireAuth("admin", () => applyRole("admin"));
+        }
       }
       return;
     }
 
-    if (!toggle.checked && session.authenticated && session.role === "admin") {
-      applyRole(session.studentId ? "student" : "guest");
+    const fallbackStudentId = StorageService.getActiveStudentId();
+    if (!fallbackStudentId || fallbackStudentId === "ALL") {
+      StorageService.setActiveStudentId("12601928");
     }
+    const targetId = StorageService.getActiveStudentId() || "12601928";
+    const known = StorageService.getKnownStudents().find((s) => s.studentId === targetId);
+    StorageService.setAuthSession({
+      authenticated: true,
+      role: "student",
+      studentId: targetId,
+      name: known ? known.name : "Alice Kumar",
+    });
+    applyRole("student");
+    refreshAllModules("student");
   });
 };
 
@@ -492,11 +516,7 @@ function showTab(tabId) {
   const session = StorageService.getAuthSession();
 
   // Route Interception: Admin Tabs
-  if (
-    ADMIN_TABS.includes(tabId) &&
-    StorageService.getActiveRole() !== "admin" &&
-    session.role !== "admin"
-  ) {
+  if (ADMIN_TABS.includes(tabId) && session.role !== "admin") {
     if (typeof window.AuthModule?.requireAuth === "function") {
       window.AuthModule.requireAuth("admin", () => applyRole("admin", tabId));
     }
@@ -959,12 +979,23 @@ const boot = () => {
     console.error("[app] seedDemoData:", err);
   }
 
-  const role = StorageService.getActiveRole() || DEFAULT_ROLE;
+  const session = StorageService.getAuthSession();
+  const role =
+    session.authenticated && session.role === "admin" ? "admin" : "student";
+  StorageService.setActiveRole(role);
 
-  // Activate tab from window.location.hash if valid so F5 refresh preserves active page
   const hash = window.location.hash ? window.location.hash.replace(/^#/, "") : "";
-  const validHashTab = hash && document.getElementById(hash) && document.querySelector(`#sidebar-nav .nav-link[data-tab="${hash}"]`);
-  const initialTab = validHashTab && !(ADMIN_TABS.includes(hash) && role !== "admin") ? hash : null;
+  const validHashTab =
+    hash &&
+    document.getElementById(hash) &&
+    document.querySelector(`#sidebar-nav .nav-link[data-tab="${hash}"]`);
+  const isProtectedStudentHash =
+    PROTECTED_STUDENT_TABS.includes(hash) && !session.authenticated;
+  const isProtectedAdminHash = ADMIN_TABS.includes(hash) && role !== "admin";
+  const initialTab =
+    validHashTab && !isProtectedStudentHash && !isProtectedAdminHash
+      ? hash
+      : null;
 
   applyRole(role, initialTab);
   bindRoleToggle();

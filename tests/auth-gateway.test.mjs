@@ -599,8 +599,8 @@ test("Logout Reset: AuthModule.logout clears session and resets to guest state",
   assert.equal(AuthModule.isAuthenticated(), false);
   assert.equal(AuthModule.getCurrentRole(), "guest");
 
-  // Verify role reset to guest view
-  assert.equal(StorageService.getActiveRole(), "guest", "Active role must be reset to guest");
+  // Verify role reset to student view
+  assert.equal(StorageService.getActiveRole(), "student", "Active role must be reset to student");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -135,30 +135,20 @@ const showBanner = (message, type = "error") => {
   const errBanner = document.getElementById("auth-form-error") || document.getElementById("auth-banner-error");
   const infoBanner = document.getElementById("auth-banner-info");
 
-  if (type === "info") {
-    if (infoBanner) {
-      infoBanner.textContent = message;
-      infoBanner.hidden = false;
-      infoBanner.style.display = "";
-    }
-    if (errBanner) {
-      errBanner.textContent = message;
-      errBanner.hidden = false;
-      errBanner.style.display = "";
-      errBanner.className = "auth-banner auth-banner--info";
-    }
-  } else {
-    if (infoBanner) {
-      infoBanner.textContent = "";
-      infoBanner.hidden = true;
-      infoBanner.style.display = "none";
-    }
-    if (errBanner) {
-      errBanner.textContent = message;
-      errBanner.hidden = false;
-      errBanner.style.display = "";
-      errBanner.className = "auth-banner auth-banner--error";
-    }
+  if (infoBanner) {
+    infoBanner.textContent = type === "info" ? message : "";
+    infoBanner.hidden = true;
+    infoBanner.style.display = "none";
+  }
+
+  if (errBanner) {
+    errBanner.textContent = message;
+    errBanner.hidden = false;
+    errBanner.style.display = "";
+    errBanner.className =
+      type === "info"
+        ? "auth-banner auth-banner--info"
+        : "auth-banner auth-banner--error";
   }
 };
 
@@ -224,20 +214,22 @@ const loginStudent = (student) => {
   StorageService.setActiveRole("student");
   StorageService.setActiveStudentId(student.studentId);
 
+  const cb = pendingCallback;
+  pendingCallback = null;
   closeAuthModal();
+
   if (typeof window.showToast === "function") {
     window.showToast(`Welcome, ${student.name}!`, "success");
   }
 
   if (window.app && typeof window.app.applyRole === "function") {
     window.app.applyRole("student");
-  } else if (window.app && typeof window.app.refreshAllModules === "function") {
+  }
+  if (window.app && typeof window.app.refreshAllModules === "function") {
     window.app.refreshAllModules("student");
   }
 
-  if (typeof pendingCallback === "function") {
-    const cb = pendingCallback;
-    pendingCallback = null;
+  if (typeof cb === "function") {
     cb();
   }
 };
@@ -355,20 +347,22 @@ const handleAdminSubmit = (e) => {
   StorageService.setAuthSession(session);
   StorageService.setActiveRole("admin");
 
+  const cb = pendingCallback;
+  pendingCallback = null;
   closeAuthModal();
+
   if (typeof window.showToast === "function") {
     window.showToast("Organizer access verified.", "success");
   }
 
   if (window.app && typeof window.app.applyRole === "function") {
     window.app.applyRole("admin");
-  } else if (window.app && typeof window.app.refreshAllModules === "function") {
+  }
+  if (window.app && typeof window.app.refreshAllModules === "function") {
     window.app.refreshAllModules("admin");
   }
 
-  if (typeof pendingCallback === "function") {
-    const cb = pendingCallback;
-    pendingCallback = null;
+  if (typeof cb === "function") {
     cb();
   }
 };
@@ -397,6 +391,7 @@ const openAuthModal = (defaultTab = "student", onSuccess = null) => {
 };
 
 const closeAuthModal = () => {
+  pendingCallback = null;
   if (authDialog && typeof authDialog.close === "function") {
     authDialog.close();
   }
@@ -414,19 +409,20 @@ const requireAuth = (requiredRole, onSuccess) => {
 };
 
 const logout = () => {
+  pendingCallback = null;
   StorageService.clearAuthSession();
-  StorageService.setActiveRole("guest");
+  StorageService.setActiveRole("student");
   StorageService.setActiveStudentId("ALL");
+
+  if (window.app && typeof window.app.applyRole === "function") {
+    window.app.applyRole("student", "discover");
+  }
+  if (window.app && typeof window.app.refreshAllModules === "function") {
+    window.app.refreshAllModules("student");
+  }
 
   if (typeof window.showToast === "function") {
     window.showToast("Signed out. Switched to Guest Mode.", "info");
-  }
-
-  if (window.app && typeof window.app.refreshAllModules === "function") {
-    window.app.refreshAllModules("guest");
-  }
-  if (window.app && typeof window.app.showTab === "function") {
-    window.app.showTab("discover");
   }
 };
 

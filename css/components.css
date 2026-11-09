@@ -516,7 +516,7 @@ dialog::backdrop {
 }
 
 .dialog-body,
-.dialog > .dialog-panel > :not(header):not(footer) {
+.dialog > .dialog-panel > :not(header):not(footer):not(.auth-tabs):not(.auth-banner) {
   padding: var(--space-lg) var(--space-xl);
   overflow-y: auto;
   flex: 1 1 auto;
@@ -524,6 +524,19 @@ dialog::backdrop {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+.dialog > .dialog-panel > .auth-tabs {
+  flex-direction: row;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding: var(--space-xs) var(--space-xl) 0;
+}
+
+.dialog > .dialog-panel > .auth-banner {
+  flex: 0 0 auto;
+  overflow: visible;
+  padding: var(--space-sm) var(--space-md);
 }
 
 .dialog > .dialog-panel > .pass-layout {
