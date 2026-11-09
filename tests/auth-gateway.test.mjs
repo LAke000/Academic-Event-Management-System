@@ -52,6 +52,10 @@ class MockElement {
     };
   }
 
+  get options() {
+    return this.children.filter((c) => c.tagName === "OPTION");
+  }
+
   set innerHTML(html) {
     this._innerHTML = html;
     if (html === "") this.children = [];
@@ -61,6 +65,10 @@ class MockElement {
   set textContent(text) { this._innerHTML = String(text); }
 
   appendChild(child) {
+    if (child && !(child instanceof MockElement)) {
+      this._innerHTML = child.textContent !== undefined ? String(child.textContent) : String(child);
+      return child;
+    }
     if (child instanceof MockElement) child.parentElement = this;
     this.children.push(child);
     return child;
@@ -154,7 +162,7 @@ const setupAuthDialogElements = () => {
   _elements["btn-submit-student-auth"].textContent = "Continue";
 };
 
-// Initial populate of registration and app elements
+// Initial populate of registration, events, and app elements
 [
   "registration-dialog", "registration-form", "reg-student-preset",
   "reg-event-id", "reg-student-name", "reg-student-id", "reg-email",
@@ -165,9 +173,18 @@ const setupAuthDialogElements = () => {
   "pass-studentid", "pass-email", "pass-regid", "reminders-banner",
   "chip-name", "chip-status", "chip-avatar", "btn-auth-action",
   "student-switcher", "role-toggle", "btn-seed-data", "toast-container",
+  "discover-list", "discover-empty", "reminders-banner-discover",
+  "event-search-input", "dept-filter-select", "type-filter-select",
+  "avail-filter-select", "date-filter-input", "event-create-dialog",
+  "event-create-form", "btn-create-event", "btn-cancel-event",
+  "events-list", "events-empty", "events-table-body", "event-form-error",
 ].forEach((id) => {
   if (!_elements[id]) _elements[id] = new MockElement("div", id);
 });
+if (_elements["discover-list"] && !_elements["discover-list"].parentElement) {
+  const discoverWrapper = new MockElement("div", "discover-wrapper");
+  discoverWrapper.appendChild(_elements["discover-list"]);
+}
 
 bodyEl.insertAdjacentHTML = (_pos, _html) => {
   setupAuthDialogElements();
@@ -177,6 +194,7 @@ globalThis.document = {
   readyState: "complete",
   body: bodyEl,
   createElement(tagName) { return new MockElement(tagName); },
+  createTextNode(str) { return { textContent: String(str ?? "") }; },
   getElementById(id) {
     return _elements[id] || null;
   },
@@ -201,6 +219,8 @@ globalThis.window.app = {
 const { default: StorageService } = await import("../js/storage.js");
 const { default: AuthModule } = await import("../js/auth.js");
 const { default: RegistrationModule } = await import("../js/registration.js");
+const { default: EventsModule } = await import("../js/events.js");
+globalThis.window.EventsModule = EventsModule;
 
 // ─── Scaffolding: Reset localStorage & Auth dialog ──────────────────────────
 
@@ -391,6 +411,45 @@ test("Guest Mode: events.js gates event registration for unauthenticated users",
     eventsSrc.includes("StorageService.getAuthSession()") &&
       (eventsSrc.includes(".authenticated") || eventsSrc.includes("session.authenticated")),
     "js/events.js openRegistrationModal must verify authenticated authSession"
+  );
+});
+
+test("Guest Mode: hides personal registration badges on Discover cards and intercepts openRegistrationModal with AuthModule", async () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  StorageService.setActiveStudentId("12601928");
+  rebindAuthDialog();
+
+  assert.equal(StorageService.getAuthSession().authenticated, false, "Initial state must be unauthenticated");
+
+  EventsModule.renderDiscover();
+  const cards = _elements["discover-list"].children;
+  assert.ok(cards.length > 0, "Discover event cards must be rendered");
+
+  cards.forEach((card) => {
+    assert.ok(
+      !card.innerHTML.includes("Registered ✓"),
+      "Guest mode must not display personal Registered ✓ badge"
+    );
+    assert.ok(
+      !card.innerHTML.includes("btn-view-my-pass"),
+      "Guest mode must not display View My Pass button"
+    );
+    assert.ok(
+      !card.innerHTML.includes("btn-card-drop-seat"),
+      "Guest mode must not display Drop Seat button"
+    );
+  });
+
+  assert.equal(_elements["auth-dialog"].open, false, "Auth dialog should initially be closed");
+  const firstEvent = StorageService.getEvents()[0];
+  assert.ok(firstEvent, "At least one event should exist");
+
+  await EventsModule.openRegistrationModal(firstEvent.id);
+  assert.equal(
+    _elements["auth-dialog"].open,
+    true,
+    "openRegistrationModal in Guest mode must trigger requireAuth and open Auth dialog"
   );
 });
 
