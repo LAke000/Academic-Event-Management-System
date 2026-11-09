@@ -384,6 +384,10 @@ class StorageService {
     const regsOk = this._write(REGISTRATIONS_KEY, []);
     const feedbackOk = this._write(FEEDBACK_KEY, []);
     const remindersOk = this._write(REMINDERS_KEY, []);
+
+    // Purge session on database wipe
+    this.clearAuthSession();
+
     const students = this._read(STUDENTS_KEY, null);
     if (!students || !Array.isArray(students) || students.length === 0) {
       this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
@@ -391,10 +395,9 @@ class StorageService {
     try {
       localStorage.setItem(CLEARED_FLAG_KEY, "true");
     } catch (_err) {}
-    const session = this.getAuthSession();
-    if (!session.authenticated) {
-      this.setActiveStudentId("ALL");
-    }
+
+    this.setActiveStudentId("ALL");
+    this.setActiveRole("student");
     return eventsOk && regsOk && feedbackOk && remindersOk;
   }
 

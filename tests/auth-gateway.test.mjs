@@ -341,6 +341,22 @@ test("resetDatabase: removes auth session key", () => {
   assert.equal(session.authenticated, false);
 });
 
+test("clearAllData: purges session and resets to guest state", () => {
+  resetStore();
+  StorageService.setAuthSession({ authenticated: true, role: "student", studentId: "12601928", name: "Alice" });
+  StorageService.setActiveRole("student");
+  StorageService.setActiveStudentId("12601928");
+
+  StorageService.clearAllData();
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, false, "Session must not be authenticated");
+  assert.equal(session.role, "guest", "Session role must be guest");
+  assert.equal(session.studentId, null, "studentId must be null");
+  assert.equal(StorageService.getActiveRole(), "student", "Active role must be student");
+  assert.equal(StorageService.getActiveStudentId(), "ALL", "Active student id must be ALL");
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. Guest Mode Default & Route Gating
 // ═══════════════════════════════════════════════════════════════════════════
