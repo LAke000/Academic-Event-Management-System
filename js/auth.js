@@ -26,6 +26,7 @@ let btnSubmitStudent = null;
 let studentHint = null;
 
 let pendingCallback = null;
+let pendingRequiredRole = null;
 
 const ensureAuthDialog = () => {
   if (document.getElementById(AUTH_DIALOG_ID)) return;
@@ -215,7 +216,9 @@ const loginStudent = (student) => {
   StorageService.setActiveStudentId(student.studentId);
 
   const cb = pendingCallback;
+  const reqRole = pendingRequiredRole;
   pendingCallback = null;
+  pendingRequiredRole = null;
   closeAuthModal();
 
   if (typeof window.showToast === "function") {
@@ -229,7 +232,7 @@ const loginStudent = (student) => {
     window.app.refreshAllModules("student");
   }
 
-  if (typeof cb === "function") {
+  if (typeof cb === "function" && (!reqRole || reqRole === "student" || reqRole === "any")) {
     cb();
   }
 };
@@ -348,7 +351,9 @@ const handleAdminSubmit = (e) => {
   StorageService.setActiveRole("admin");
 
   const cb = pendingCallback;
+  const reqRole = pendingRequiredRole;
   pendingCallback = null;
+  pendingRequiredRole = null;
   closeAuthModal();
 
   if (typeof window.showToast === "function") {
@@ -362,16 +367,18 @@ const handleAdminSubmit = (e) => {
     window.app.refreshAllModules("admin");
   }
 
-  if (typeof cb === "function") {
+  if (typeof cb === "function" && (!reqRole || reqRole === "admin" || reqRole === "any")) {
     cb();
   }
 };
 
-const openAuthModal = (defaultTab = "student", onSuccess = null) => {
+const openAuthModal = (defaultTab = "student", onSuccess = null, requiredRole = null) => {
   resolveRefs();
+  bindEvents();
   if (!authDialog) return;
 
   pendingCallback = onSuccess;
+  pendingRequiredRole = requiredRole || defaultTab;
 
   const fStudent = document.getElementById("auth-student-form") || document.getElementById("auth-form-student");
   const fAdmin = document.getElementById("auth-admin-form") || document.getElementById("auth-form-admin");
@@ -392,6 +399,7 @@ const openAuthModal = (defaultTab = "student", onSuccess = null) => {
 
 const closeAuthModal = () => {
   pendingCallback = null;
+  pendingRequiredRole = null;
   if (authDialog && typeof authDialog.close === "function") {
     authDialog.close();
   }
@@ -404,12 +412,13 @@ const requireAuth = (requiredRole, onSuccess) => {
     if (typeof onSuccess === "function") onSuccess();
     return true;
   }
-  openAuthModal(requiredRole === "admin" ? "admin" : "student", onSuccess);
+  openAuthModal(requiredRole === "admin" ? "admin" : "student", onSuccess, requiredRole);
   return false;
 };
 
 const logout = () => {
   pendingCallback = null;
+  pendingRequiredRole = null;
   StorageService.clearAuthSession();
   StorageService.setActiveRole("student");
   StorageService.setActiveStudentId("ALL");
@@ -428,6 +437,8 @@ const logout = () => {
 
 const bindEvents = () => {
   resolveRefs();
+  if (!authDialog || authDialog._eventsBound) return;
+  authDialog._eventsBound = true;
 
   if (tabStudent) tabStudent.addEventListener("click", () => switchTab("student"));
   if (tabAdmin) tabAdmin.addEventListener("click", () => switchTab("admin"));
@@ -502,6 +513,8 @@ const bindEvents = () => {
       if (e.target === authDialog) closeAuthModal();
     });
     authDialog.addEventListener("close", () => {
+      pendingCallback = null;
+      pendingRequiredRole = null;
       clearBanners();
     });
   }

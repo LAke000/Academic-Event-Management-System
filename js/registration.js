@@ -185,7 +185,12 @@ const openRegistrationModal = (eventId) => {
   const activeAlreadyInEvent =
     activeStudentId &&
     activeStudentId !== "ALL" &&
-    eventRegs.some((r) => r.studentId === activeStudentId);
+    eventRegs.some(
+      (r) =>
+        r.studentId === activeStudentId &&
+        r.status !== "Cancelled" &&
+        r.attendance?.status !== "Cancelled"
+    );
 
   let selectedPresetId = "";
   if (activeStudentId && activeStudentId !== "ALL" && !activeAlreadyInEvent) {
@@ -364,6 +369,15 @@ const handleRegistrationSubmit = (event) => {
   // passes/history views are scoped to them automatically.
   try {
     StorageService.setActiveStudentId(studentId);
+    const curSession = StorageService.getAuthSession();
+    if (curSession.authenticated && curSession.role === "student") {
+      StorageService.setAuthSession({
+        authenticated: true,
+        role: "student",
+        studentId,
+        name,
+      });
+    }
   } catch (_err) {
     // non-fatal
   }

@@ -174,9 +174,13 @@ window.showToast = (message, type = "info") => {
 
 const setBodyRole = (role) => {
   const session = StorageService.getAuthSession();
-  const effectiveRole = (!session.authenticated && role !== "admin") ? "student" : role;
+  const isGuest = !session.authenticated && role !== "admin";
+  const effectiveRole = isGuest ? "student" : role;
   document.body.classList.remove("role-student", "role-admin", "role-guest");
   document.body.classList.add(`role-${effectiveRole}`);
+  if (isGuest) {
+    document.body.classList.add("role-guest");
+  }
 };
 
 const toggleAdminTabs = (role) => {
@@ -331,6 +335,7 @@ const refreshStudentSwitcher = (role) => {
 
 const updateProfileChip = (role) => {
   const session = StorageService.getAuthSession();
+  const profileChip = document.getElementById("profile-chip");
   const chipName = document.getElementById("chip-name");
   const chipStatus = document.getElementById("chip-status");
   const chipAvatar = document.getElementById("chip-avatar");
@@ -338,6 +343,10 @@ const updateProfileChip = (role) => {
   let switcher = document.getElementById("student-switcher");
 
   if (!session.authenticated) {
+    if (profileChip) {
+      profileChip.style.cursor = "pointer";
+      profileChip.title = "Click to sign in";
+    }
     if (chipName) chipName.textContent = "Guest Mode";
     if (chipStatus) chipStatus.textContent = "Sign in to register";
     if (chipAvatar) {
@@ -356,6 +365,10 @@ const updateProfileChip = (role) => {
   }
 
   // Authenticated
+  if (profileChip) {
+    profileChip.style.cursor = "default";
+    profileChip.title = "";
+  }
   if (btnAuthAction) {
     btnAuthAction.textContent = "Sign Out";
     btnAuthAction.className = "btn btn-ghost btn-sm";
@@ -382,12 +395,19 @@ const updateProfileChip = (role) => {
     }
 
     const activeId = StorageService.getActiveStudentId();
-    const student = StorageService.getKnownStudents().find((s) => s.studentId === activeId);
+    const allRegs = StorageService.getRegistrations();
+    const studentRegs =
+      activeId === "ALL"
+        ? allRegs
+        : allRegs.filter((r) => r.studentId === activeId);
+    const known = StorageService.getKnownStudents().find((s) => s.studentId === activeId);
+    const firstReg = studentRegs[0];
+    const studentName = (known && known.name) || (firstReg && firstReg.name) || "";
     const displayName =
       activeId === "ALL"
         ? "All Demo Students"
-        : student
-        ? `${student.name} (${student.studentId})`
+        : studentName
+        ? `${studentName} (${activeId})`
         : `Student (${activeId})`;
 
     if (chipName) chipName.textContent = displayName;
@@ -395,17 +415,12 @@ const updateProfileChip = (role) => {
       chipAvatar.textContent =
         activeId === "ALL"
           ? "S"
-          : student
-          ? student.name.charAt(0).toUpperCase()
+          : studentName
+          ? studentName.charAt(0).toUpperCase()
           : "S";
       chipAvatar.className = "chip-avatar";
     }
 
-    const allRegs = StorageService.getRegistrations();
-    const studentRegs =
-      activeId === "ALL"
-        ? allRegs
-        : allRegs.filter((r) => r.studentId === activeId);
     const activeRegs = studentRegs.filter(
       (r) => r.status !== "Cancelled" && r.attendance?.status !== "Cancelled"
     );
@@ -511,12 +526,20 @@ const bindRoleToggle = () => {
  * @param {string} tabId
  */
 function showTab(tabId) {
-  if (!tabId) return;
-
   const session = StorageService.getAuthSession();
+  const activeRole = StorageService.getActiveRole() || DEFAULT_ROLE;
+
+  if (!tabId || !document.getElementById(tabId)) {
+    tabId = activeRole === "admin" ? DEFAULT_VIEW_ADMIN : DEFAULT_VIEW_STUDENT;
+  }
+
+  if (STUDENT_TABS.includes(tabId) && StorageService.getActiveRole() === "admin") {
+    showTab(DEFAULT_VIEW_ADMIN);
+    return;
+  }
 
   // Route Interception: Admin Tabs
-  if (ADMIN_TABS.includes(tabId) && session.role !== "admin") {
+  if (ADMIN_TABS.includes(tabId) && session.role !== "admin" && StorageService.getActiveRole() !== "admin") {
     if (typeof window.AuthModule?.requireAuth === "function") {
       window.AuthModule.requireAuth("admin", () => applyRole("admin", tabId));
     }

@@ -713,3 +713,151 @@ test("Quick Demo Admin: Event Organizer button fills and logs in", () => {
   assert.equal(callbackExecuted, true);
   assert.equal(_elements["auth-dialog"].open, false);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. Cross-Tab Privilege Escalation & State Preservation
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Cross-tab callback safety: initiating Admin login via requireAuth('admin', cb) then logging in on the Student tab does NOT execute the Admin callback", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let adminActionExecuted = false;
+  AuthModule.requireAuth("admin", () => {
+    adminActionExecuted = true;
+  });
+
+  // User switches to student tab and logs in as student
+  _elements["auth-student-id"].value = "12601928";
+  _elements["auth-form-student"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true);
+  assert.equal(session.role, "student");
+  assert.equal(adminActionExecuted, false, "Admin callback must not execute when student logs in");
+});
+
+test("Cross-Tab Role Escalation Guard: admin login does not execute student-required callback", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let studentActionExecuted = false;
+  AuthModule.requireAuth("student", () => {
+    studentActionExecuted = true;
+  });
+
+  // User switches to admin tab and logs in as admin
+  _elements["auth-admin-user"].value = "admin";
+  _elements["auth-admin-pass"].value = "AEMS-Admin-2026";
+  _elements["auth-admin-form"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  const session = StorageService.getAuthSession();
+  assert.equal(session.authenticated, true);
+  assert.equal(session.role, "admin");
+  assert.equal(studentActionExecuted, false, "Student callback must not execute when admin logs in");
+});
+
+test("Closing #auth-dialog clears pendingCallback", () => {
+  resetStore();
+  StorageService.clearAuthSession();
+  rebindAuthDialog();
+
+  let actionExecuted = false;
+  AuthModule.requireAuth("student", () => {
+    actionExecuted = true;
+  });
+
+  // Dialog close (e.g. Escape key or closeAuthModal)
+  _elements["auth-dialog"].dispatchEvent({ type: "close" });
+
+  // Now logging in directly should NOT trigger the cleared callback
+  _elements["auth-student-id"].value = "12601928";
+  _elements["auth-form-student"].dispatchEvent({ type: "submit", preventDefault() {} });
+
+  assert.equal(actionExecuted, false, "Pending callback must have been reset on dialog close");
+});
+
+test("Re-opening openRegistrationModal after a cancelled registration still autofills the active student's profile", () => {
+  resetStore();
+  StorageService.setAuthSession({
+    authenticated: true,
+    role: "student",
+    studentId: "12601928",
+    name: "Alice Kumar",
+  });
+  StorageService.setActiveStudentId("12601928");
+
+  // In demo data, Alice Kumar is registered for EVT-101.
+  // When active student is already registered, form is reset and does not prefill active profile
+  RegistrationModule.openRegistrationModal("EVT-101");
+  assert.equal(
+    _elements["reg-student-id"].value,
+    "",
+    "When active student is actively registered, modal must not autofill that student"
+  );
+
+  // Cancel Alice's registration for EVT-101
+  const regs = StorageService.getRegistrations();
+  const aliceReg = regs.find((r) => r.studentId === "12601928" && r.eventId === "EVT-101");
+  assert.ok(aliceReg, "Alice registration for EVT-101 must exist");
+  aliceReg.status = "Cancelled";
+  aliceReg.attendance = { status: "Cancelled", checkInTime: null };
+  StorageService.saveRegistrations(regs);
+
+  // Re-open openRegistrationModal for EVT-101
+  RegistrationModule.openRegistrationModal("EVT-101");
+  assert.equal(
+    _elements["reg-student-id"].value,
+    "12601928",
+    "After registration is cancelled, re-opening modal must autofill studentId"
+  );
+  assert.equal(
+    _elements["reg-student-name"].value,
+    "Alice Kumar",
+    "After registration is cancelled, re-opening modal must autofill student name"
+  );
+  assert.equal(
+    _elements["reg-email"].value,
+    "alice.kumar@example.edu",
+    "After registration is cancelled, re-opening modal must autofill student email"
+  );
+  assert.equal(
+    _elements["reg-department"].value,
+    "CSE",
+    "After registration is cancelled, re-opening modal must autofill student department"
+  );
+});
+
+test("StorageService.seedDemoData preserves custom onboarded students", () => {
+  resetStore();
+  StorageService.seedDemoData(true);
+
+  // Add a custom student
+  StorageService.saveKnownStudent({
+    studentId: "12699888",
+    name: "Custom Student",
+    email: "custom@example.edu",
+    department: "ECE",
+  });
+
+  assert.ok(
+    StorageService.getKnownStudents().some((s) => s.studentId === "12699888"),
+    "Custom student must be in known students list"
+  );
+
+  // Re-seed with force = true
+  StorageService.seedDemoData(true);
+
+  const updated = StorageService.getKnownStudents();
+  assert.ok(
+    updated.some((s) => s.studentId === "12699888"),
+    "Custom student must survive forced seedDemoData(true)"
+  );
+  assert.ok(
+    updated.some((s) => s.studentId === "12601928"),
+    "Default student must also be present"
+  );
+});
+

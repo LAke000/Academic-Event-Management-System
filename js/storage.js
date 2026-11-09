@@ -433,9 +433,16 @@ class StorageService {
       return;
     }
 
-    // Seed known students roster
-    if (!this._read(STUDENTS_KEY, null) || force) {
+    // Seed known students roster (merge DEFAULT_STUDENTS with existing custom students)
+    const existingStudents = this._read(STUDENTS_KEY, null);
+    if (!existingStudents || !Array.isArray(existingStudents) || existingStudents.length === 0) {
       this._write(STUDENTS_KEY, DEFAULT_STUDENTS);
+    } else {
+      const defaultIds = new Set(DEFAULT_STUDENTS.map((s) => s.studentId));
+      const customStudents = existingStudents.filter(
+        (s) => s && s.studentId && !defaultIds.has(s.studentId)
+      );
+      this._write(STUDENTS_KEY, [...DEFAULT_STUDENTS, ...customStudents]);
     }
 
     const existing = this.getEvents();
@@ -784,18 +791,9 @@ class StorageService {
     ];
     this.saveReminders(reminders);
 
-    const seededStudentIds = [
-      "12601928",
-      "12601929",
-      "12601930",
-      "12601931",
-      "12601932",
-      "12601933",
-      "12601934",
-      "12601935",
-    ];
+    const knownIds = this.getKnownStudents().map((s) => s.studentId);
     const currentActive = this.getActiveStudentId();
-    if (currentActive !== "ALL" && !seededStudentIds.includes(currentActive)) {
+    if (currentActive !== "ALL" && !knownIds.includes(currentActive)) {
       this.setActiveStudentId("12601928");
     }
   }
