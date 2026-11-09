@@ -507,11 +507,18 @@ const bindRoleToggle = () => {
       return;
     }
 
-    // Flipping back from Admin Mode to Student/Guest view
-    if (session.authenticated && session.role === "admin") {
-      StorageService.clearAuthSession();
-    }
+    // Flipping back from Admin Mode to Student Portal (Alice Kumar)
+    const targetId = StorageService.getActiveStudentId() === "ALL" ? "12601928" : (StorageService.getActiveStudentId() || "12601928");
+    const known = StorageService.getKnownStudents().find((s) => s.studentId === targetId);
+    StorageService.setAuthSession({
+      authenticated: true,
+      role: "student",
+      studentId: targetId,
+      name: known ? known.name : "Alice Kumar",
+    });
+    StorageService.setActiveRole("student");
     applyRole("student", "discover");
+    refreshAllModules("student");
   });
 };
 
