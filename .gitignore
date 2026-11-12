@@ -23,5 +23,7 @@ temp/
 .claude/
 .vscode/
 .idea/
+CLAUDE.md
 claude.md
 fixes.txt
+fixes*
