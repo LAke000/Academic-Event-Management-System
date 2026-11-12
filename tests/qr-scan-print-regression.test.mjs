@@ -260,3 +260,40 @@ test("css/print.css hides dialog::backdrop and sizes #pass-dialog #qrcode-target
     "css/print.css must set object-fit: contain !important on #pass-dialog #qrcode-target canvas/img"
   );
 });
+
+test("#scanner-view renders .scanner-target-box > .scanner-scan-line and contains no .corner-bracket nodes", () => {
+  const html = fs.readFileSync(path.resolve("index.html"), "utf-8");
+  const css = fs.readFileSync(path.resolve("css/components.css"), "utf-8");
+
+  // DOM check on #scanner-view
+  const scannerViewMatch = html.match(/<div[^>]*id=["']scanner-view["'][^>]*>([\s\S]*?)<\/div>\s*<div[^>]*id=["']scanner-empty["']/i);
+  assert.ok(scannerViewMatch, "#scanner-view must be present in index.html");
+
+  const scannerViewHtml = scannerViewMatch[1];
+  assert.ok(
+    scannerViewHtml.includes('class="scanner-target-box"'),
+    "#scanner-view must contain .scanner-target-box"
+  );
+  assert.ok(
+    scannerViewHtml.includes('class="scanner-scan-line"'),
+    ".scanner-target-box must contain .scanner-scan-line"
+  );
+  assert.ok(
+    !scannerViewHtml.includes("corner-bracket"),
+    "#scanner-view must contain no .corner-bracket nodes"
+  );
+
+  // CSS audit
+  assert.ok(
+    css.includes("#reader #qr-shaded-region > div"),
+    "css/components.css must suppress html5-qrcode shaded region white brackets"
+  );
+  assert.ok(
+    css.includes(".scanner-scan-line"),
+    "css/components.css must define .scanner-scan-line"
+  );
+  assert.ok(
+    css.includes("@keyframes qrScanSweep"),
+    "css/components.css must define @keyframes qrScanSweep"
+  );
+});

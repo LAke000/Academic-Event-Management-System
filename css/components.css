@@ -710,6 +710,13 @@ input[type="radio"] {
   display: block !important;
 }
 
+/* Suppress html5-qrcode's default white corner bracket overlays */
+#reader #qr-shaded-region > div,
+.corner-bracket {
+  display: none !important;
+  border: none !important;
+}
+
 .scanner-target-box {
   position: absolute;
   top: 50%;
@@ -719,54 +726,40 @@ input[type="radio"] {
   transform: translate(-50%, -50%);
   border: 2px solid var(--color-accent);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-glow);
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.35), var(--shadow-glow);
+  overflow: hidden;
   pointer-events: none;
   z-index: 2;
-  animation: scanPulse 2s ease-in-out infinite;
 }
 
-@keyframes scanPulse {
+.scanner-scan-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 10px;
+  height: 2.5px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    rgba(2, 132, 199, 0) 0%,
+    #38bdf8 20%,
+    #ffffff 50%,
+    #38bdf8 80%,
+    rgba(2, 132, 199, 0) 100%
+  );
+  box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.85);
+  animation: qrScanSweep 2.2s ease-in-out infinite;
+}
+
+@keyframes qrScanSweep {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4);
+    top: 10px;
+    opacity: 0.85;
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(2, 132, 199, 0);
+    top: calc(100% - 12px);
+    opacity: 1;
   }
-}
-
-.corner-bracket {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--color-accent);
-}
-
-.corner-bracket.top-left {
-  top: -2px;
-  left: -2px;
-  border-right: none;
-  border-bottom: none;
-}
-
-.corner-bracket.top-right {
-  top: -2px;
-  right: -2px;
-  border-left: none;
-  border-bottom: none;
-}
-
-.corner-bracket.bottom-left {
-  bottom: -2px;
-  left: -2px;
-  border-right: none;
-  border-top: none;
-}
-
-.corner-bracket.bottom-right {
-  bottom: -2px;
-  right: -2px;
-  border-left: none;
-  border-top: none;
 }
 
 .camera-controls {
