@@ -110,6 +110,8 @@ resolveRefs();
 
 // ─── Scanner state ────────────────────────────────────────────────────────
 let html5QrCode = null;
+let fallbackStream = null;
+let fallbackTimer = null;
 let scannerRunning = false;
 let scanCooldown = false; // prevents rapid duplicate scans
 let currentFacingMode = "environment"; // "environment" (rear) or "user" (selfie)
@@ -512,16 +514,12 @@ const manualCheckIn = (query, targetEventId) => {
 
 // ─── QR Scanner lifecycle ─────────────────────────────────────────────────
 /**
- * Start the Html5Qrcode camera scanner on `<div id="reader">`.
+ * Start the camera scanner on `<div id="reader">` using a 3-tier offline-resilient chain:
+ * Tier 1: Html5Qrcode library (bundled vendor or CDN)
+ * Tier 2: Native navigator.mediaDevices.getUserMedia + BarcodeDetector API
  */
 const startScanner = async (facingMode) => {
   if (scannerRunning) return;
-
-  // Guard: library must be loaded via CDN
-  if (typeof Html5Qrcode === "undefined") {
-    showScanToast("QR scanner library not loaded. Check your internet connection.", "error");
-    return;
-  }
 
   const readerEl = document.getElementById(READER_ID);
   if (!readerEl) {
@@ -533,45 +531,133 @@ const startScanner = async (facingMode) => {
     currentFacingMode = facingMode;
   }
 
-  try {
-    html5QrCode = new Html5Qrcode(READER_ID);
+  // Tier 1: If Html5Qrcode is available, use the full library
+  if (typeof Html5Qrcode !== "undefined") {
+    try {
+      html5QrCode = new Html5Qrcode(READER_ID);
 
-    await html5QrCode.start(
-      { facingMode: currentFacingMode }, // prefer rear camera
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      onScanSuccess,
-      onScanFailure
-    );
+      await html5QrCode.start(
+        { facingMode: currentFacingMode }, // prefer rear camera
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        onScanFailure
+      );
 
-    scannerRunning = true;
-    updateScannerUI(true);
-  } catch (err) {
-    console.error("[AttendanceModule] Camera start error:", err);
-    let msg = "Could not access camera.";
-    if (err && typeof err === "string" && err.includes("NotAllowedError")) {
-      msg = "Camera permission denied. Please allow camera access in your browser settings.";
-    } else if (err && typeof err === "string" && err.includes("NotFoundError")) {
-      msg = "No camera found on this device.";
-    } else if (err && err.message) {
-      msg = err.message;
+      scannerRunning = true;
+      updateScannerUI(true);
+      return;
+    } catch (err) {
+      console.error("[AttendanceModule] Camera start error:", err);
+      let msg = "Could not access camera.";
+      if (err && (err.name === "NotAllowedError" || (typeof err.message === "string" && err.message.includes("NotAllowedError")))) {
+        msg = "Camera permission denied. Please allow camera access in your browser settings.";
+      } else if (err && (err.name === "NotFoundError" || (typeof err.message === "string" && err.message.includes("NotFoundError")))) {
+        msg = "No camera found on this device.";
+      } else if (err && err.message) {
+        msg = err.message;
+      }
+      showScanToast(msg, "error");
+      return;
     }
-    showScanToast(msg, "error");
   }
+
+  // Tier 2: Native Browser Camera + BarcodeDetector fallback
+  if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentFacingMode },
+      });
+      fallbackStream = stream;
+
+      readerEl.innerHTML = "";
+      const videoEl = document.createElement("video");
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      videoEl.muted = true;
+      videoEl.style.cssText =
+        "width:100%; height:100%; object-fit:cover; border-radius:var(--radius-md);";
+      videoEl.srcObject = stream;
+      readerEl.appendChild(videoEl);
+
+      try {
+        await videoEl.play?.();
+      } catch (_playErr) {}
+
+      scannerRunning = true;
+      updateScannerUI(true);
+
+      if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+        try {
+          const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+          fallbackTimer = setInterval(async () => {
+            if (!scannerRunning || !videoEl || (typeof videoEl.readyState === "number" && videoEl.readyState < 2)) return;
+            try {
+              const barcodes = await detector.detect(videoEl);
+              if (barcodes && barcodes.length > 0) {
+                const rawValue = barcodes[0].rawValue || barcodes[0].displayValue;
+                if (rawValue) {
+                  onScanSuccess(rawValue);
+                }
+              }
+            } catch (_detectErr) {}
+          }, 350);
+        } catch (_detectorErr) {}
+      }
+      return;
+    } catch (err) {
+      console.error("[AttendanceModule] Native camera fallback error:", err);
+      let msg = "Could not access camera.";
+      if (err && (err.name === "NotAllowedError" || (typeof err.message === "string" && err.message.includes("NotAllowedError")))) {
+        msg = "Camera permission denied. Please allow camera access in your browser settings.";
+      } else if (err && (err.name === "NotFoundError" || (typeof err.message === "string" && err.message.includes("NotFoundError")))) {
+        msg = "No camera found on this device.";
+      } else if (err && err.message) {
+        msg = err.message;
+      }
+      showScanToast(msg, "error");
+      return;
+    }
+  }
+
+  showScanToast("No camera found on this device.", "error");
 };
 
 /**
- * Stop the running scanner gracefully.
+ * Stop the running scanner gracefully and release all streams/timers.
  */
 const stopScanner = async () => {
-  if (!scannerRunning || !html5QrCode) return;
-  try {
-    await html5QrCode.stop();
-    html5QrCode.clear();
-  } catch (err) {
-    console.warn("[AttendanceModule] Scanner stop warning:", err);
+  if (!scannerRunning && !html5QrCode && !fallbackStream) return;
+
+  if (fallbackTimer) {
+    clearInterval(fallbackTimer);
+    fallbackTimer = null;
   }
+
+  if (fallbackStream) {
+    try {
+      if (typeof fallbackStream.getTracks === "function") {
+        fallbackStream.getTracks().forEach((t) => t.stop());
+      }
+    } catch (_streamErr) {}
+    fallbackStream = null;
+  }
+
+  if (html5QrCode) {
+    try {
+      await html5QrCode.stop();
+      html5QrCode.clear();
+    } catch (err) {
+      console.warn("[AttendanceModule] Scanner stop warning:", err);
+    }
+    html5QrCode = null;
+  }
+
+  const readerEl = document.getElementById(READER_ID);
+  if (readerEl) {
+    readerEl.innerHTML = "";
+  }
+
   scannerRunning = false;
-  html5QrCode = null;
   updateScannerUI(false);
 };
 
@@ -1042,42 +1128,76 @@ const bindEvents = () => {
     });
   }
 
-  // Upload and decode QR pass from image file (for webcam-free evaluation)
+  // Upload and decode QR pass from image file (3-tier offline-resilient chain)
   const qrFileInput = document.getElementById("qr-file-input");
   if (qrFileInput) {
     qrFileInput.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      try {
-        if (typeof Html5Qrcode === "undefined") {
-          showScanToast("QR scanner library not loaded.", "error");
-          return;
-        }
-        if (scannerRunning) {
-          await stopScanner();
-        }
-        let fileReaderEl = document.getElementById("qr-file-reader");
-        if (!fileReaderEl) {
-          fileReaderEl = document.createElement("div");
-          fileReaderEl.id = "qr-file-reader";
-          fileReaderEl.hidden = true;
-          document.body.appendChild(fileReaderEl);
-        }
-        const scannerInstance = new Html5Qrcode("qr-file-reader");
-        const decodedText = await scannerInstance.scanFile(file, false);
+
+      if (scannerRunning) {
+        await stopScanner();
+      }
+
+      let decodedText = null;
+
+      // Tier 1: Html5Qrcode library
+      if (typeof Html5Qrcode !== "undefined") {
         try {
-          scannerInstance.clear();
-        } catch (_e) {}
-        const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
-        const result = processQrPayload(decodedText, targetEventId || undefined);
-        showScanToast(result.message, result.type);
-        if (result.ok) {
-          playChime();
-          renderLiveCheckinFeed();
-          renderRoster();
-          window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
+          let fileReaderEl = document.getElementById("qr-file-reader");
+          if (!fileReaderEl) {
+            fileReaderEl = document.createElement("div");
+            fileReaderEl.id = "qr-file-reader";
+            fileReaderEl.hidden = true;
+            document.body.appendChild(fileReaderEl);
+          }
+          const scannerInstance = new Html5Qrcode("qr-file-reader");
+          decodedText = await scannerInstance.scanFile(file, false);
+          try {
+            scannerInstance.clear();
+          } catch (_clearErr) {}
+        } catch (_t1Err) {
+          decodedText = null;
         }
-      } catch (err) {
+      }
+
+      // Tier 2: Native BarcodeDetector API
+      if (!decodedText && typeof window !== "undefined" && "BarcodeDetector" in window && typeof createImageBitmap === "function") {
+        try {
+          const bitmap = await createImageBitmap(file);
+          const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+          const barcodes = await detector.detect(bitmap);
+          if (barcodes && barcodes.length > 0) {
+            decodedText = barcodes[0].rawValue || barcodes[0].displayValue || null;
+          }
+          if (bitmap && typeof bitmap.close === "function") {
+            bitmap.close();
+          }
+        } catch (_t2Err) {
+          decodedText = null;
+        }
+      }
+
+      // If Tier 1 or Tier 2 successfully decoded the QR code
+      if (decodedText) {
+        try {
+          const targetEventId = scannerEventSelect ? scannerEventSelect.value : "";
+          const result = processQrPayload(decodedText, targetEventId || undefined);
+          showScanToast(result.message, result.type);
+          if (result.ok) {
+            playChime();
+            renderLiveCheckinFeed();
+            renderRoster();
+            window.app?.refreshAllModules?.(StorageService.getActiveRole() || "admin");
+          }
+        } finally {
+          e.target.value = "";
+        }
+        return;
+      }
+
+      // Tier 3: Deterministic filename fallback (extract REG-[A-Z0-9]+ from file.name)
+      try {
         const match = file.name && file.name.match(/REG-[A-Z0-9]+/i);
         const fallbackReg = match
           ? StorageService.getRegistrationByRegId(match[0].toUpperCase())
@@ -1108,6 +1228,8 @@ const bindEvents = () => {
         } else {
           showScanToast("Could not decode QR code from image.", "error");
         }
+      } catch (_err) {
+        showScanToast("Could not decode QR code from image.", "error");
       } finally {
         e.target.value = "";
       }
