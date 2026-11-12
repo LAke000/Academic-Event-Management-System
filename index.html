@@ -291,8 +291,14 @@
             </label>
           </div>
         </div>
-        <div id="scanner-view" class="scanner-view" hidden>
-          <div id="reader" class="reader">Camera feed will appear here</div>
+        <div id="scanner-view" class="scanner-view scanner-preview-wrap" hidden>
+          <div id="reader" class="reader"></div>
+          <div class="scanner-target-box" aria-hidden="true">
+            <span class="corner-bracket top-left"></span>
+            <span class="corner-bracket top-right"></span>
+            <span class="corner-bracket bottom-left"></span>
+            <span class="corner-bracket bottom-right"></span>
+          </div>
         </div>
         <div id="scanner-empty" class="empty-state" hidden>
           <div class="empty-icon">&#128273;</div>

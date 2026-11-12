@@ -677,6 +677,7 @@ input[type="radio"] {
 }
 
 /* 4. Interactive Hardware & Scanner UI */
+#scanner-view,
 .scanner-preview-wrap {
   position: relative;
   width: 100%;
@@ -685,14 +686,28 @@ input[type="radio"] {
   background-color: #000000;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  margin: 0 auto;
+  margin: var(--space-lg) auto 0;
   box-shadow: var(--shadow-lg);
+}
+
+#scanner-view[hidden],
+.scanner-preview-wrap[hidden] {
+  display: none !important;
 }
 
 #reader {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  position: relative;
+  background-color: #000000;
+}
+
+#reader video,
+#reader canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
 }
 
 .scanner-target-box {
@@ -706,6 +721,7 @@ input[type="radio"] {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-glow);
   pointer-events: none;
+  z-index: 2;
   animation: scanPulse 2s ease-in-out infinite;
 }
 

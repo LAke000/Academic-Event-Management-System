@@ -67,8 +67,11 @@ globalThis.localStorage = {
 
 const mockElements = {
   "reader": new MockElement("div", "reader"),
+  "scanner-view": new MockElement("div", "scanner-view"),
+  "scanner-empty": new MockElement("div", "scanner-empty"),
   "btn-start-scanner": new MockElement("button", "btn-start-scanner"),
   "btn-stop-scanner": new MockElement("button", "btn-stop-scanner"),
+  "btn-camera-toggle": new MockElement("button", "btn-camera-toggle"),
   "scanner-event-select": new MockElement("select", "scanner-event-select"),
   "qr-file-input": new MockElement("input", "qr-file-input"),
   "manual-checkin-search": new MockElement("input", "manual-checkin-search"),
