@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs and runtime diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files and scratch buffers
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Claude and editor local workspace
+.claude/
+.vscode/
+.idea/

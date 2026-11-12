@@ -15,12 +15,13 @@
 3. [Architectural Justification (Evaluation Defense)](#architectural-justification-evaluation-defense)
 4. [Feature Matrix](#feature-matrix)
 5. [Critical Business Rules](#critical-business-rules)
-6. [File Architecture (14 Files)](#file-architecture-14-files)
+6. [File Architecture (16 Files)](#file-architecture-16-files)
 7. [External Libraries (CDN)](#external-libraries-cdn)
 8. [Database Schemas (localStorage)](#database-schemas-localstorage)
-9. [Step-by-Step Running Guide](#step-by-step-running-guide)
-10. [Grading / Demo Walkthrough](#grading--demo-walkthrough)
-11. [Constraints Summary](#constraints-summary)
+9. [Evaluator Demo Credentials](#evaluator-demo-credentials)
+10. [Step-by-Step Running Guide](#step-by-step-running-guide)
+11. [Grading / Demo Walkthrough](#grading--demo-walkthrough)
+12. [Constraints Summary](#constraints-summary)
 
 ---
 
@@ -116,10 +117,11 @@ Because the project requires a pure client-side stack with zero backend, the app
 3. **Gated Post-Event Access:** The Feedback form and Certificate download are only accessible if `attendance.status === "Present"`. Absent students cannot claim certificates.
 4. **Empty States:** User-friendly "Call to Action" screens appear when `localStorage` is empty (e.g., "No Events Created Yet → [Create Event]").
 5. **Camera Scanner Access:** The Live QR Scanner tab is available in Admin Mode for organizer check-in at venue doors. There is no separate scan-only gate delegate sub-view.
+6. **Authentication & Roll Number Validation:** `js/auth.js` enforces dual-role session gating (Guest, Student, Admin). Student identification strictly requires an 8-digit roll number beginning with `126` (`/^126\d{5}$/`, e.g., `126xxxxx`). Recognized student profiles log in automatically, while unrecognized valid IDs step into profile creation. Admin access requires authorized organizer credentials (`admin` / `AEMS-Admin-2026`).
 
 ---
 
-## File Architecture (15 Files)
+## File Architecture (16 Files)
 
 ```
 academic-event-system/
@@ -131,6 +133,7 @@ academic-event-system/
 │   └── print.css               # @media print rules for passes and certificates
 ├── js/
 │   ├── app.js                  # SPA routing, tab navigation, role-switching
+│   ├── auth.js                 # Authentication gateway, modal dialog, and session gating
 │   ├── storage.js              # localStorage wrapper & Demo Data Seeder
 │   ├── events.js               # Event CRUD & dynamic capacity checking
 │   ├── registration.js         # Deduplication logic & QR pass generation
@@ -147,10 +150,12 @@ academic-event-system/
 
 | File | Responsibility |
 |---|---|
-| `index.html` | Semantic SPA shell: top bar, role toggle, sidebar navigation, 9 `tab-pane` sections, 4 `<dialog>` modals (Create Event, Digital Boarding Pass, Feedback, Certificate), toast container, and all 8 module script imports. |
+| `index.html` | Semantic SPA shell: top bar, role toggle, sidebar navigation, 9 `tab-pane` sections, 4 `<dialog>` modals (Create Event, Digital Boarding Pass, Feedback, Certificate), toast container, and all 9 module script imports. |
 | `css/main.css` | CSS custom properties (design tokens: navy `#1e3a8a`, slate grays), reset rules, layout grid, responsive sidebar and main viewport. |
 | `css/components.css` | Reusable components: cards, data tables, badges (Open / Housefull / Registered / Present), toast alerts, star-rating, form fields, buttons, empty states. |
 | `css/print.css` | `@media print` stylesheet for QR passes and certificates — hides nav/buttons, optimizes for paper output. |
+| `js/app.js` | SPA router: tab switching, role-switching (Student ⇄ Admin), sidebar active state, empty-state toggling, global toast dispatcher, module initialization. |
+| `js/auth.js` | Authentication gateway: dual-role gating (Guest, Student, Admin), sign-in modal controller, 8-digit `126xxxxx` roll number auto-detection, and session persistence. |
 | `js/storage.js` | `localStorage` wrapper: `get`, `set`, `remove` for `academic_events_db`, `academic_registrations_db`, `academic_feedback_db`, `academic_reminders_db`, `academic_students_db`. Demo Data Seeder populates synthetic campus events, registrations, feedback, reminders, and demo student profiles. |
 | `js/utils.js` | Shared helpers: `generateId()` for unique IDs, `deepClone()` for record integrity, `formatDate()` for ISO date formatting. |
 | `js/events.js` | Event CRUD operations, dynamic capacity counting, "Housefull" badge rendering, event card/table row generation. |
@@ -159,7 +164,6 @@ academic-event-system/
 | `js/feedback.js` | Gated feedback form (only if `attendance.status === "Present"`), 5-star interactive rating, comment textarea, submission to `academic_feedback_db`. |
 | `js/certificate.js` | HTML5 `<canvas>` certificate rendering (student name, event title, date), PNG download, print certificate action. |
 | `js/reports.js` | Native CSV Blob export (no server), Chart.js integration for attendance/turnout analytics, export buttons for registrations/attendance/feedback. |
-| `js/app.js` | SPA router: tab switching, role-switching (Student ⇄ Admin), sidebar active state, empty-state toggling, global toast dispatcher, module initialization. |
 | `assets/beep.mp3` | Audio chime played on successful QR scan check-in. |
 
 ---
@@ -282,11 +286,28 @@ Stores known campus student profiles used for evaluator quick-fill and profile a
 
 ### Session & Operational Keys
 
+- `academic_auth_session`: Active authentication session object (`{ authenticated: boolean, role: "guest"|"student"|"admin", studentId: string|null, name: string|null }`).
 - `academic_active_role`: Current user mode (`"student"` or `"admin"`).
 - `academic_active_student`: Currently active student roll number for profile simulation (e.g. `"12601928"` or `"ALL"`).
 - `academic_db_cleared`: Flag (`"true"`) set when evaluator clicks "Clear All Data" to prevent unintended automatic reseeding.
 
 All date/time values use ISO 8601 strings. The values shown above are synthetic/sample data per the project specification, not production data.
+
+---
+
+## Evaluator Demo Credentials
+
+The portal features a single-click authentication gateway (`js/auth.js`) supporting instant evaluator testing:
+
+| Mode | Identifier / Username | Passcode / Verification | Demo Persona / Permissions |
+|---|---|---|---|
+| **Student Mode** | `12601928` | Auto-detected (or 1-click **Alice Kumar** button) | Alice Kumar (Dept. of CSE) — browse, register, download QR pass, view history & certificates |
+| **Admin Mode** | `admin` | `AEMS-Admin-2026` (or 1-click **Event Organizer** button) | University Event Organizer / Admin — full event CRUD, roster, QR scanner, feedback review, CSV exports |
+
+### Student Roll Number Format Rule
+All student roll numbers must strictly adhere to the university 8-digit format beginning with `126`:
+- **Pattern:** `/^126\d{5}$/` (e.g., `12601928`, `12604412`, `12699999`).
+- **Auto-detection:** Recognized roll numbers log in instantly; new valid 8-digit IDs prompt for student name, email, and department to onboard seamlessly.
 
 ---
 
@@ -313,19 +334,22 @@ All date/time values use ISO 8601 strings. The values shown above are synthetic/
 
 Instructions for professors and evaluators:
 
-1. **Open the portal.** Launch `index.html` in the browser. You start in **Student Mode** with an empty `localStorage`.
-2. **Load demo academic data.** Switch to **Admin / Organizer Mode** using the toggle in the top bar, then click **"Load Demo Academic Data"** on the Dashboard. This seeds:
+1. **Open the portal.** Launch `index.html` in the browser. You start in **Guest Mode** (unauthenticated) with protected actions safely gated.
+2. **One-Click Demo Authentication.** Click **Sign In** in the top bar:
+   - For **Student Mode**: Enter `12601928` (or click **Alice Kumar**) to unlock student registration, passes, and certificate access.
+   - For **Admin Mode**: Enter `admin` / `AEMS-Admin-2026` (or click **Event Organizer**) to unlock organizer management.
+3. **Load demo academic data.** Switch to **Admin Mode** using the top bar toggle (or sign in as admin), then click **"Load Demo Academic Data"** on the Dashboard. This seeds:
    - `academic_events_db` with sample events (e.g., Deep Learning Workshop in Audi-3, Department of CSE)
    - `academic_registrations_db` with sample student registrations
    - `academic_feedback_db` with sample reviews
    - `academic_reminders_db` with sample organizer reminders
    - `academic_students_db` with known campus student demo profiles
-3. **Explore as a student.** Switch back to **Student Mode**. Browse events on **Discover Events**, register for an event, and open **My Passes** to see the generated QR entry pass. Click **Print Pass** to test the print stylesheet.
-4. **Test capacity and deduplication.** Register the same student for the same event twice — the second attempt is blocked by deduplication logic. Fill an event to capacity — the UI displays **"Housefull"** and disables further registration.
-5. **Test the live QR scanner.** In Admin Mode, open **Live QR Scanner**, click **Start Camera**, and scan a student's QR pass from another device (or a printed pass). A check-in toast appears and the roster updates to `Present`. Use the manual check-in search as a fallback.
-6. **Test gated post-event access.** Once a student is checked in as **Present**, they can open **History & Certificates**, submit feedback via the 5-star rating form, and download a PNG certificate generated on an HTML5 `<canvas>`.
-7. **Export reports.** In Admin Mode, open **Reports & CSV Export** and export Registrations, Attendance, or Feedback as CSV files using native Browser Blobs (no server round-trip). View the Chart.js attendance chart.
-8. **Reset state.** Click **Clear All Data** on the Dashboard to wipe `localStorage` and return to a clean slate for the next demo.
+4. **Explore as a student.** Switch back to **Student Mode**. Browse events on **Discover Events**, register for an event, and open **My Passes** to see the generated QR entry pass. Click **Print Pass** to test the print stylesheet.
+5. **Test capacity and deduplication.** Register the same student for the same event twice — the second attempt is blocked by deduplication logic. Fill an event to capacity — the UI displays **"Housefull"** and disables further registration.
+6. **Test the live QR scanner.** In Admin Mode, open **Live QR Scanner**, click **Start Camera**, and scan a student's QR pass from another device (or a printed pass). A check-in toast appears and the roster updates to `Present`. Use the manual check-in search as a fallback.
+7. **Test gated post-event access.** Once a student is checked in as **Present**, they can open **History & Certificates**, submit feedback via the 5-star rating form, and download a PNG certificate generated on an HTML5 `<canvas>`.
+8. **Export reports.** In Admin Mode, open **Reports & CSV Export** and export Registrations, Attendance, or Feedback as CSV files using native Browser Blobs (no server round-trip). View the Chart.js attendance chart.
+9. **Reset state.** Click **Clear All Data** on the Dashboard to wipe `localStorage` and return to a clean slate for the next demo.
 
 ---
 
@@ -334,5 +358,5 @@ Instructions for professors and evaluators:
 - **Zero backend:** No server, no SQL database, no Node.js/Python.
 - **Vanilla stack only:** Pure HTML5, CSS3, ES6+ JavaScript. No React, Vue, Tailwind, or Bootstrap.
 - **Data persistence:** Browser `localStorage` only, using the schemas defined above.
-- **File architecture:** Strictly the 15-file structure above. No unnecessary files.
+- **File architecture:** Strictly the 16-file structure above. No unnecessary files.
 - **External libraries:** Only the three approved CDNs (qrcode.min.js, html5-qrcode.min.js, Chart.js).
